@@ -1,0 +1,4076 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROC D'AZUR — Saisie Bénévoles</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="192x192" href="favicon_192.png">
+<script>
+// ============================================================
+// ★ SEULE LIGNE À CHANGER D'UNE ANNÉE SUR L'AUTRE ★
+// Adresse du « déploiement » Apps Script (Extensions → Apps Script → Déployer →
+// Gérer les déploiements → URL de l'application web). Elle se termine par /exec.
+// Tout le reste (année, dates des jours, listes) vient du Google Sheet.
+// ============================================================
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT_00UAQha4-r4vkSIsfZDmgawohGZWUv3k-gUr90Ew4gEt_RGcpQQ/exec';
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap');
+
+  :root {
+    --rouge: #C0392B;
+    --rouge-vif: #E74C3C;
+    --orange: #E67E22;
+    --dark: #1A1A2E;
+    --dark2: #16213E;
+    --dark3: #0F3460;
+    --gris: #2C3E50;
+    --gris2: #34495E;
+    --texte: #ECF0F1;
+    --texte2: #BDC3C7;
+    --vert: #27AE60;
+    --bleu: #2980B9;
+    --jaune: #F39C12;
+    --border: rgba(255,255,255,0.08);
+    --input-bg: rgba(255,255,255,0.06);
+    --input-focus: rgba(192,57,43,0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--dark);
+    color: var(--texte);
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ========= HEADER ========= */
+  header {
+    background: linear-gradient(135deg, var(--dark2) 0%, var(--dark3) 100%);
+    border-bottom: 3px solid var(--rouge);
+    padding: 0;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 20px;
+    gap: 16px;
+  }
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px; font-weight: 900; letter-spacing: 1px;
+    color: var(--texte);
+    white-space: nowrap;
+  }
+  .header-title span { color: var(--rouge-vif); }
+  .header-controls {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .jour-selector {
+    display: flex; gap: 4px;
+  }
+  .btn-jour {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
+    padding: 6px 12px; border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--input-bg); color: var(--texte2);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-jour:hover { background: var(--gris2); color: var(--texte); }
+  .btn-jour.active {
+    background: var(--rouge); border-color: var(--rouge-vif);
+    color: #fff; box-shadow: 0 0 12px rgba(231,76,60,0.4);
+  }
+  .btn-action {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
+    padding: 7px 14px; border-radius: 4px; border: none;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-report { background: var(--bleu); color: #fff; }
+  .btn-report:hover { background: #3498DB; }
+  .btn-pdf { background: var(--rouge); color: #fff; }
+  .btn-pdf:hover { background: var(--rouge-vif); }
+  .btn-add-secteur { background: var(--vert); color: #fff; }
+  .btn-add-secteur:hover { background: #2ECC71; }
+  .badge-conflicts {
+    background: var(--orange); color: #fff;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 12px;
+    padding: 4px 10px; border-radius: 20px; display: none;
+  }
+
+  /* ========= MAIN LAYOUT ========= */
+  main {
+    padding: 16px 20px;
+    max-width: 1600px; margin: 0 auto;
+  }
+
+  /* ========= DATE BAR ========= */
+  .date-bar {
+    background: linear-gradient(90deg, var(--dark3) 0%, var(--dark2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .date-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px; font-weight: 700; letter-spacing: 2px;
+    color: var(--rouge-vif); text-transform: uppercase;
+  }
+  .stats-bar {
+    display: flex; gap: 20px;
+    font-size: 12px; color: var(--texte2);
+  }
+  .stat-item { display: flex; align-items: center; gap: 6px; }
+  .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .stat-dot.rouge { background: var(--rouge-vif); }
+  .stat-dot.vert { background: var(--vert); }
+  .stat-dot.jaune { background: var(--jaune); }
+  .stat-val { font-weight: 600; color: var(--texte); }
+
+  /* ========= SECTEUR BLOC ========= */
+  .secteur-bloc {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+  .secteur-bloc:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+
+  .secteur-header {
+    background: linear-gradient(90deg, rgba(192,57,43,0.2) 0%, rgba(15,52,96,0.4) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; user-select: none;
+  }
+  .secteur-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 24px; font-weight: 900;
+    color: var(--rouge-vif); min-width: 32px;
+    line-height: 1;
+  }
+  .secteur-name-select {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px; font-weight: 700; letter-spacing: 1px;
+    background: transparent; border: none; color: var(--texte);
+    cursor: pointer;
+    padding: 2px 6px; border-radius: 4px;
+    transition: background 0.15s;
+    -webkit-appearance: none;
+    background-image: none;
+  }
+  .secteur-name-select:hover { background: rgba(255,255,255,0.08); }
+  .secteur-name-select option { background: var(--dark2); font-size: 14px; font-weight: 400; }
+
+  .secteur-meta {
+    display: flex; align-items: center; gap: 16px; flex: 1;
+    flex-wrap: wrap;
+  }
+  .meta-field {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--texte2);
+  }
+  .meta-field label { white-space: nowrap; font-weight: 500; }
+  .meta-select, .meta-input {
+    background: #f0f0f0; border: 1px solid #bbb;
+    color: #111; border-radius: 4px; padding: 4px 8px;
+    font-family: 'Barlow', sans-serif; font-size: 12px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .meta-select:focus, .meta-input:focus {
+    outline: none; border-color: var(--rouge);
+    background: var(--input-focus);
+  }
+  .meta-select { width: 150px; }
+  .meta-input { width: 65px; }
+  .meta-tel {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px; color: var(--jaune); font-weight: 600;
+    min-width: 110px;
+  }
+
+  .secteur-actions {
+    display: flex; align-items: center; gap: 8px; margin-left: auto;
+  }
+  .btn-sm {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--input-bg); color: var(--texte2); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-sm:hover { background: var(--gris); color: var(--texte); }
+  .btn-sm.danger:hover { background: #922B21; border-color: var(--rouge); color: #fff; }
+  .btn-sm.success { background: rgba(39,174,96,0.15); border-color: var(--vert); color: var(--vert); }
+  .btn-sm.success:hover { background: var(--vert); color: #fff; }
+  .toggle-icon {
+    font-size: 16px; color: var(--texte2); transition: transform 0.2s;
+  }
+  .secteur-bloc.collapsed .toggle-icon { transform: rotate(-90deg); }
+
+  /* ========= TABLE PS ========= */
+  .table-wrapper {
+    overflow-x: auto;
+    padding: 0 0 4px 0;
+  }
+  .secteur-bloc.collapsed .table-wrapper { display: none; }
+
+  table.ps-table {
+    width: 100%; border-collapse: collapse;
+    min-width: 900px;
+  }
+  .ps-table thead th {
+    background: rgba(0,0,0,0.3);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+    color: var(--texte2); text-transform: uppercase;
+    padding: 7px 10px; text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .ps-table thead th.col-radios { text-align: center; }
+  .ps-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .ps-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+  .ps-table tbody tr.ps-row-dirty { background: rgba(192,57,43,0.06); }
+  .ps-table td {
+    padding: 5px 6px; vertical-align: middle;
+  }
+  .ps-table td.col-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px; font-weight: 700; color: var(--texte2);
+    padding-left: 14px; min-width: 28px;
+  }
+
+  /* inputs dans table */
+  .ps-table input[type=text], .ps-table select {
+    width: 100%; background: var(--input-bg);
+    border: 1px solid transparent; border-radius: 4px;
+    color: var(--texte); padding: 5px 7px;
+    font-family: 'Barlow', sans-serif; font-size: 13px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .ps-table input[type=text]:focus, .ps-table select:focus {
+    outline: none; border-color: var(--rouge);
+    background: var(--input-focus);
+  }
+  .ps-table select option { background: var(--dark2); }
+  .ps-table input[type=text]::placeholder { color: rgba(255,255,255,0.2); font-style: italic; }
+
+  .col-ps { min-width: 200px; }
+  .col-hmep { width: 80px; }
+  .col-veh { width: 110px; }
+  .col-benv { min-width: 130px; }
+  .col-radio { width: 52px; text-align: center; }
+  .col-obs { min-width: 140px; }
+  .col-del { width: 32px; text-align: center; }
+  .col-det { width: 54px; text-align: center; }
+
+  /* volet « Détails » d'un PS (style des cartes LA_GAILLARDE, sur fond sombre) */
+  .btn-det { background: transparent; border: 1px solid var(--border); color: var(--texte2); border-radius: 4px;
+    padding: 2px 6px; cursor: pointer; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .btn-det:hover { color: var(--texte); border-color: var(--bleu); }
+  .btn-det.ouvert { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+  .btn-det.rempli { border-color: #D4AC0D; color: #F4D03F; }
+  .btn-det.ouvert.rempli { color: #fff; }
+  .btn-det.conflit { border-color: var(--orange); color: var(--orange); }
+  .det-row > td { padding: 0 !important; background: rgba(0,0,0,0.18); }
+  .det-box { margin: 4px 10px 10px 34px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--dark2); }
+  .det-sec { background: rgba(212,172,13,0.10); color: #D4AC0D; font-family: 'Barlow Condensed', sans-serif; font-size: 12px;
+    font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; border-top: 1px solid var(--border); }
+  .det-sec:first-child { border-top: 0; }
+  .det-sec .det-auto { margin-left: 8px; font-size: 10px; letter-spacing: .5px; padding: 1px 6px; border-radius: 3px; background: rgba(39,174,96,.2); color: #82E0AA; text-transform: none; }
+  .det-grid { display: grid; gap: 8px 12px; padding: 8px 12px; }
+  .det-g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .det-g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .det-g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .det-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--texte2); text-transform: uppercase; margin-bottom: 3px; }
+  .det-box input[type=text], .det-box select { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--texte); padding: 5px 7px; font-family: 'Barlow', sans-serif; font-size: 13px; }
+  .det-box input[type=text]:focus, .det-box select:focus { outline: none; border-color: var(--rouge); background: var(--input-focus); }
+  .det-box select option { background: var(--dark2); }
+  .det-box input[type=text]::placeholder { color: rgba(255,255,255,0.2); font-style: italic; }
+  .det-box .conflict-cell select { border-color: var(--orange); }
+  .det-pied { padding: 6px 12px 8px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border); }
+  .det-pied button { background: transparent; border: 1px dashed var(--texte2); color: var(--texte2); border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  .det-pied button:hover { color: var(--texte); border-color: var(--texte); }
+  @media (max-width: 900px) { .det-g4, .det-g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .det-box { margin-left: 8px; } }
+
+  /* radio number input */
+  .radio-num {
+    width: 44px; height: 30px; text-align: center;
+    background: var(--input-bg); border: 1px solid transparent;
+    border-radius: 4px; color: var(--texte);
+    font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700;
+    cursor: pointer; -moz-appearance: textfield;
+    transition: border-color 0.15s, background 0.15s;
+    display: block; margin: 0 auto;
+  }
+  .radio-num::-webkit-inner-spin-button,
+  .radio-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .radio-num:focus { outline: none; border-color: var(--rouge); background: var(--input-focus); }
+  .radio-num.has-value { color: var(--vert); border-color: rgba(39,174,96,0.4); }
+  .radio-num.com.has-value { color: #7EC8E3; border-color: rgba(41,128,185,0.4); }
+  .radio-num.crs.has-value { color: #00BCD4; border-color: rgba(0,188,212,0.4); }
+  .radio-num.cmv.has-value { color: #82E0AA; border-color: rgba(39,174,96,0.4); }
+
+  /* row-ajouter */
+  .btn-add-ps {
+    width: 100%; padding: 7px; font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.5px;
+    background: transparent; border: 1px dashed rgba(255,255,255,0.12);
+    color: var(--texte2); cursor: pointer; transition: all 0.15s;
+    border-radius: 0 0 6px 6px;
+  }
+  .btn-add-ps:hover {
+    background: rgba(39,174,96,0.1); border-color: var(--vert); color: var(--vert);
+  }
+
+  .btn-del-row {
+    background: none; border: none; color: rgba(255,255,255,0.15);
+    cursor: pointer; font-size: 15px; padding: 4px; border-radius: 3px;
+    transition: all 0.15s; display: block; margin: 0 auto;
+  }
+  .btn-del-row:hover { background: rgba(192,57,43,0.3); color: var(--rouge-vif); }
+
+  /* conflict highlight */
+  .conflict-cell input, .conflict-cell select {
+    border-color: var(--orange) !important;
+    background: rgba(230,126,34,0.12) !important;
+  }
+  .conflict-ps select {
+    border-color: #E74C3C !important;
+    background: rgba(192,57,43,0.22) !important;
+  }
+  .secteur-bloc.solo .btn-add-ps, .secteur-bloc.solo .secteur-actions .btn-sm.success { display: none !important; }
+  .secteur-bloc.solo .secteur-num { background: #8E44AD; }
+  .chk-tous { font-size: 11px; color: var(--texte2); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+  .conflict-veh input, .conflict-veh select {
+    border-color: #E74C3C !important;
+    background: rgba(192,57,43,0.18) !important;
+  }
+  .conflict-badge {
+    font-size: 10px; background: var(--orange); color: #fff;
+    border-radius: 3px; padding: 1px 4px; margin-left: 4px;
+    vertical-align: middle; display: none;
+  }
+  .conflict-badge.visible { display: inline; }
+
+  /* ========= RADIO STAT PILLS (date-bar) ========= */
+  .radio-stat-pill {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 4px; border: 1px solid;
+    transition: all 0.2s;
+  }
+  .radio-stat-pill.com { background: rgba(41,128,185,0.15); border-color: rgba(88,166,255,0.3); color: #7EC8E3; }
+  .radio-stat-pill.crs { background: rgba(0,150,136,0.15); border-color: rgba(0,188,212,0.4); color: #00BCD4; }
+  .radio-stat-pill.cmv { background: rgba(39,174,96,0.15); border-color: rgba(63,185,80,0.3); color: #82E0AA; }
+  .radio-stat-pill.over { background: rgba(231,76,60,0.3); border-color: var(--rouge-vif); color: #fff; animation: pulse-warn 1s infinite; }
+  @keyframes pulse-warn { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+  /* ========= ALERTS BAR ========= */
+  #alertsBar { margin: 0 0 10px 0; display: flex; flex-direction: column; gap: 5px; }
+  .alert-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; border-radius: 7px; font-size: 13px;
+    border: 1px solid;
+  }
+  .alert-item.radio-over {
+    background: rgba(192,57,43,0.12); border-color: rgba(231,76,60,0.4); color: #F1948A;
+  }
+  .alert-item.veh-double {
+    background: rgba(230,126,34,0.12); border-color: rgba(230,126,34,0.4); color: var(--orange);
+  }
+  .alert-icon { font-size: 15px; flex-shrink: 0; }
+  .alert-text strong { color: #fff; }
+
+  /* ========= COMMENTAIRES SECTEUR ========= */
+  .secteur-commentaires {
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.15);
+    padding: 10px 16px 12px;
+  }
+  .secteur-bloc.collapsed .secteur-commentaires { display: none; }
+  .commentaires-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    color: var(--texte2); text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+  .commentaires-grid {
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .comment-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .comment-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; color: var(--texte2); min-width: 18px; text-align: right;
+  }
+  .comment-input {
+    flex: 1; background: var(--input-bg); border: 1px solid transparent;
+    border-radius: 4px; color: var(--texte); padding: 5px 10px;
+    font-family: 'Barlow', sans-serif; font-size: 13px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .comment-input:focus {
+    outline: none; border-color: var(--jaune);
+    background: rgba(243,156,18,0.08);
+  }
+  .comment-input::placeholder { color: rgba(255,255,255,0.18); font-style: italic; }
+  .comment-input.has-value { border-color: rgba(243,156,18,0.3); color: var(--jaune); }
+
+  /* ========= PANEL REPORT ========= */
+  .report-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 200; display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .report-overlay.active { display: flex; }
+  .report-panel {
+    background: var(--dark2); border: 1px solid var(--border);
+    border-radius: 12px; width: 100%; max-width: 820px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .report-header {
+    background: linear-gradient(90deg, var(--rouge) 0%, var(--dark3) 100%);
+    padding: 16px 20px; border-radius: 12px 12px 0 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .report-header h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px; font-weight: 900; letter-spacing: 1.5px;
+  }
+  .btn-close {
+    background: rgba(0,0,0,0.3); border: none; color: #fff;
+    border-radius: 50%; width: 32px; height: 32px; font-size: 18px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .report-body { padding: 20px; }
+  .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .report-table th {
+    background: rgba(0,0,0,0.3); padding: 8px 10px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 11px;
+    letter-spacing: 0.8px; text-transform: uppercase; color: var(--texte2);
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  .report-table td {
+    padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+  }
+  .report-table tr:hover td { background: rgba(255,255,255,0.03); }
+  .radio-pill {
+    display: inline-block; font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 2px 6px; border-radius: 3px; margin: 1px;
+  }
+  .radio-pill.com { background: rgba(41,128,185,0.3); color: #7EC8E3; }
+  .radio-pill.crs { background: rgba(0,150,136,0.25); color: #00E5FF; }
+  .radio-pill.cmv { background: rgba(39,174,96,0.3); color: #82E0AA; }
+  .btn-print {
+    background: var(--rouge); color: #fff;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    font-size: 14px; padding: 10px 24px; border: none;
+    border-radius: 6px; cursor: pointer; margin-top: 16px;
+    transition: background 0.15s;
+  }
+  .btn-print:hover { background: var(--rouge-vif); }
+
+  /* ========= TOAST ========= */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--vert); color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 12px 20px; border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s; z-index: 300;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.warn { background: var(--orange); }
+  .toast.err { background: var(--rouge); }
+
+  @media print {
+    /* Par défaut : tout masqué sauf contenu normal */
+    header, .date-bar, .stats-bar, .secteur-actions,
+    .btn-add-ps, .btn-del-row, .no-print-report { display: none !important; }
+    #reportOverlay, #ficheSectOverlay { display: none !important; }
+    body { background: #fff; color: #000; }
+    .secteur-header { background: #eee; }
+
+    /* ── Mode impression Fiche Secteur ── */
+    body.print-fiche-sect header,
+    body.print-fiche-sect main,
+    body.print-fiche-sect #reportOverlay,
+    body.print-fiche-sect #fichesPSOverlay { display: none !important; }
+    body.print-fiche-sect #ficheSectOverlay {
+      display: block !important; position: static !important;
+      padding: 0; background: none !important; overflow: visible !important;
+    }
+    body.print-fiche-sect .fiche-sect-panel { box-shadow: none; border-radius: 0; max-width: 100%; }
+    body.print-fiche-sect .fiche-sect-controls,
+    body.print-fiche-sect .btn-fiche-print,
+    body.print-fiche-sect .btn-close { display: none !important; }
+    body.print-fiche-sect .fs-section-header {
+      background: #2C3E50 !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    body.print-fiche-sect .fs-table th {
+      background: #2C3E50 !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+
+    /* ── Mode impression Report Jx ── */
+    body.print-report header,
+    body.print-report main,
+    body.print-report #ficheSectOverlay,
+    body.print-report #fichesPSOverlay { display: none !important; }
+    body.print-report #reportOverlay {
+      display: block !important; position: static !important;
+      padding: 0; background: none !important; overflow: visible !important;
+    }
+    body.print-report .fiche-sect-panel { box-shadow: none; border-radius: 0; max-width: 100%; }
+    body.print-report .fiche-sect-controls,
+    body.print-report .btn-fiche-print,
+    body.print-report .btn-close { display: none !important; }
+    body.print-report .fs-section-header {
+      background: #2C3E50 !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    body.print-report .fs-table th {
+      background: #2C3E50 !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+
+    /* Report Jx Tous Secteurs : A4 paysage (page nommée, sans effet sur les autres impressions) */
+    body.print-report .rpt-page { page: report; }
+    body.print-report .rpt-table tr { page-break-inside: avoid; break-inside: avoid; }
+    body.print-report .rpt-table thead { display: table-header-group; }
+    body.print-report .rpt-table th, body.print-report .rpt-recap, body.print-report .rpt-table tr:nth-child(even) td, body.print-report .rpt-table tr.rpt-band td {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    body.print-report #toast { display: none !important; }
+    body.print-report .rpt-table { font-size: 10.5px; }
+    body.print-report .rpt-table td, body.print-report .rpt-table th { padding: 3px 6px; }
+
+    /* ── Mode impression Fiches PS ── */
+    body.print-fiches-ps header,
+    body.print-fiches-ps main,
+    body.print-fiches-ps #ficheSectOverlay,
+    body.print-fiches-ps #reportOverlay { display: none !important; }
+    body.print-fiches-ps #fichesPSOverlay .fs-titre,
+    body.print-fiches-ps #fichesPSOverlay .fs-sous-titre,
+    body.print-fiches-ps #fpsBarre,
+    body.print-fiches-ps #toast { display: none !important; } /* la fiche porte déjà son titre */
+    body.print-fiches-ps #fichesPSOverlay {
+      display: block !important; position: static !important;
+      padding: 0; background: none !important; overflow: visible !important;
+    }
+    body.print-fiches-ps .fiche-sect-panel { box-shadow: none; border-radius: 0; max-width: 100%; }
+    body.print-fiches-ps .fiche-sect-controls,
+    body.print-fiches-ps #fpsPSSelector,
+    body.print-fiches-ps .fps-no-print { display: none !important; }
+    body.print-fiches-ps .fps-card { page-break-inside: avoid; page-break-after: always; margin-bottom: 0; border: 1px solid #ddd; }
+    body.print-fiches-ps .fps-card.fps-last { page-break-after: avoid; }
+    body.print-fiches-ps .fps-hidden { display: none !important; }
+    body.print-fiches-ps .fs-section-header {
+      background: #2C3E50 !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    body.print-fiches-ps .glrd-fiche-header {
+      background: #1A3A5C !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    body.print-fiches-ps .fps-card .glrd-fiche { margin-bottom: 0; }
+    body.print-fiches-ps .fs-table th {
+      background: #2C3E50 !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+  }
+
+
+
+  /* ========= LA_GAILLARDE ========= */
+  .glrd-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    z-index: 400; display: none; align-items: flex-start; justify-content: center;
+    padding: 16px; overflow-y: hidden;
+  }
+  .glrd-overlay.active { display: flex; }
+  .glrd-panel {
+    background: #fff; color: #111; border-radius: 10px;
+    width: 100%; max-width: 1100px; margin: auto;
+    font-family: Arial, sans-serif; font-size: 13px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    display: flex; flex-direction: column;
+    max-height: calc(100vh - 32px); overflow: hidden;
+  }
+  .glrd-header {
+    background: #B7950B; color: #fff;
+    padding: 12px 20px; border-radius: 10px 10px 0 0;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    
+  }
+  .glrd-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px; font-weight: 900; letter-spacing: 2px; flex: 1;
+  }
+  .glrd-tabs {
+    display: flex; border-bottom: 2px solid #e0e0e0;
+    background: #f5f5f5;
+    
+  }
+  .glrd-tab {
+    padding: 10px 20px; cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: #777; border: none;
+    background: transparent; border-bottom: 3px solid transparent;
+    transition: all 0.15s; margin-bottom: -2px;
+  }
+  .glrd-tab.active { color: #B7950B; border-bottom-color: #B7950B; background: #fff; }
+  .glrd-tab-content { display: none; padding: 20px; }
+  .glrd-tab-content.active { display: block; overflow-y: auto; flex: 1; }
+  /* Formulaire saisie */
+  .glrd-ps-card {
+    border: 1px solid #ddd; border-radius: 6px;
+    margin-bottom: 14px; overflow: hidden;
+  }
+  .glrd-ps-header {
+    background: #1A3A5C; color: #fff; padding: 8px 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700;
+  }
+  .glrd-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 12px 14px;
+  }
+  .glrd-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .glrd-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .glrd-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .glrd-field label {
+    display: block; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: #888; margin-bottom: 4px;
+  }
+  .glrd-field select, .glrd-field input[type=text],
+  .glrd-field input[type=number] {
+    width: 100%; padding: 6px 8px; border: 1px solid #ccc;
+    border-radius: 4px; font-size: 12px; background: #fafafa;
+  }
+  .glrd-field select:focus, .glrd-field input:focus {
+    outline: none; border-color: #B7950B; background: #FFFDE7;
+  }
+  .glrd-radio-row {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .glrd-radio-row input[type=number] {
+    width: 60px; text-align: center; font-weight: 700; font-size: 14px;
+  }
+  .glrd-section-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: #B7950B;
+    padding: 6px 14px; background: #FFFDE7;
+    border-top: 1px solid #eee; border-bottom: 1px solid #eee;
+  }
+  .glrd-btn-add {
+    margin: 8px 14px 14px; padding: 7px 16px;
+    background: #1A3A5C; color: #fff; border: none;
+    border-radius: 5px; cursor: pointer; font-weight: 700; font-size: 13px;
+  }
+  .glrd-btn-add:hover { background: #2980B9; }
+  .glrd-btn-del {
+    background: #C0392B; color: #fff; border: none;
+    border-radius: 4px; padding: 2px 8px; cursor: pointer;
+    font-size: 12px; margin-left: auto;
+  }
+  /* Report tableau */
+  .glrd-report-table {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  .glrd-report-table th {
+    background: #1A3A5C; color: #fff; padding: 6px 8px;
+    text-align: left; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .glrd-report-table td {
+    padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top;
+  }
+  .glrd-report-table tr:nth-child(even) td { background: #F8F9FA; }
+  /* ── Report Jx Tous Secteurs : tableau unique (même esprit que le Report LA_GAILLARDE) ── */
+  .rpt-titre { font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:900; color:#1A3A5C; margin-bottom:10px; }
+  .rpt-recap { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; border:1px solid #cfd8e3; background:#F4F7FA; border-radius:4px; padding:6px 10px; margin-bottom:10px; }
+  .rpt-recap-t { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700; color:#1A3A5C; text-transform:uppercase; letter-spacing:.5px; margin-right:6px; }
+  .rpt-box { display:inline-flex; align-items:baseline; gap:6px; background:#fff; border:1px solid #dde3ea; border-radius:3px; padding:2px 10px; }
+  .rpt-box em { font-style:normal; font-size:10px; text-transform:uppercase; color:#666; letter-spacing:.4px; }
+  .rpt-box b { font-size:16px; font-family:'Barlow Condensed',sans-serif; color:#1A3A5C; }
+  .rpt-box b.rpt-radios { font-size:13px; }
+  .rpt-table { width:100%; border-collapse:collapse; font-size:12px; color:#111; }
+  .rpt-table th { background:#1A3A5C; color:#fff; padding:6px 8px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+  .rpt-table td { padding:5px 8px; border-bottom:1px solid #e3e3e3; vertical-align:top; }
+  .rpt-table tr.rpt-band td { background:#DCE6F1; color:#1A3A5C; border-top:2px solid #1A3A5C; padding:4px 8px; font-size:12.5px; }
+  .rpt-table tr.rpt-band td span { margin-left:18px; font-size:11.5px; font-weight:600; }
+  .rpt-table tr:not(.rpt-band):nth-child(even) td { background:#F8F9FA; }
+  .rpt-table td.rpt-tel { color:#E67E22; font-size:12px; white-space:nowrap; }
+  .rpt-rad { white-space:nowrap; font-size:11px; }
+  .rpt-mep { font-weight:700; color:#C0392B; white-space:nowrap; }
+  .rpt-benv { font-size:11.5px; }
+  .rpt-obs { font-size:11px; color:#555; }
+  .rpt-vide { text-align:center; color:#999; font-style:italic; }
+  /* Fiche de poste print */
+  .glrd-fiche {
+    border: 2px solid #1A3A5C; border-radius: 6px;
+    margin-bottom: 24px; page-break-inside: avoid;
+  }
+  .glrd-fiche-header {
+    background: #1A3A5C; color: #fff; padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .glrd-fiche-body { padding: 14px 16px; }
+  .glrd-fiche-row {
+    display: flex; gap: 8px; padding: 5px 0;
+    border-bottom: 1px solid #f0f0f0; align-items: baseline;
+  }
+  .glrd-fiche-row:last-child { border-bottom: none; }
+  .glrd-fiche-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    color: #888; min-width: 120px; flex-shrink: 0;
+  }
+  .glrd-fiche-val { font-size: 13px; font-weight: 600; color: #111; }
+  .glrd-fiche-section {
+    background: #F8F9FA; padding: 6px 10px; margin: 8px 0;
+    border-radius: 4px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; color: #1A3A5C; letter-spacing: 1px;
+  }
+  @media print {
+    body.print-gaillarde header,
+    body.print-gaillarde main,
+    body.print-gaillarde #ficheSectOverlay,
+    body.print-gaillarde #fichesPSOverlay,
+    body.print-gaillarde #reportOverlay { display: none !important; }
+    body.print-gaillarde .glrd-overlay {
+      display: block !important; position: static !important;
+      padding: 0; background: none !important; overflow: visible !important;
+    }
+    body.print-gaillarde .glrd-panel {
+      box-shadow: none; border-radius: 0; max-width: 100%;
+      /* Annuler le max-height écran — sinon fiches 2+ sont coupées à l'impression */
+      max-height: none !important; overflow: visible !important;
+      display: block !important;
+    }
+    body.print-gaillarde .glrd-header,
+    body.print-gaillarde .glrd-tabs,
+    body.print-gaillarde .glrd-tab-content:not(.active),
+    body.print-gaillarde .glrd-btn-add,
+    body.print-gaillarde .glrd-btn-del,
+    body.print-gaillarde .btn-close,
+    body.print-gaillarde .btn-fiche-print,
+    body.print-gaillarde #glrdBenvSelect,
+    body.print-gaillarde [for="glrdBenvSelect"],
+    body.print-gaillarde .glrd-benv-selector,
+    body.print-gaillarde #glrdStatsBar,
+    body.print-gaillarde #glrdAlertsBar { display: none !important; }
+    body.print-gaillarde .glrd-tab-content.active {
+      display: block !important; padding: 0;
+      /* Annuler overflow-y:auto et flex:1 — sinon le contenu reste scrollable et tronqué */
+      overflow: visible !important; max-height: none !important; flex: none !important;
+    }
+    body.print-gaillarde .glrd-fiche { page-break-after: always; }
+    body.print-gaillarde .glrd-fiche:last-child { page-break-after: avoid; }
+    body.print-gaillarde .glrd-fiche-header {
+      background: #1A3A5C !important; color: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+  }
+  .fiche-sect-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 200; display: none; align-items: flex-start; justify-content: center;
+    padding: 20px; overflow-y: auto;
+  }
+  .fiche-sect-overlay.active { display: flex; }
+  .fiche-sect-panel {
+    background: #fff; color: #111;
+    border-radius: 10px; width: 100%; max-width: 900px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    font-family: Arial, sans-serif; font-size: 13px;
+    margin: auto;
+  }
+  .fiche-sect-controls {
+    background: var(--dark2); border-radius: 10px 10px 0 0;
+    padding: 12px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .fiche-sect-controls label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 12px;
+    font-weight: 700; letter-spacing: 1px; color: var(--texte2); text-transform: uppercase;
+  }
+  .fiche-sect-controls select {
+    background: #f0f0f0; border: 1px solid #bbb; color: #111;
+    border-radius: 4px; padding: 5px 10px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 600;
+  }
+  .fiche-sect-body { padding: 22px 26px; }
+  .fs-titre { font-size: 22px; font-weight: 900; text-transform: uppercase; color: #C0392B; letter-spacing: 2px; }
+  .fs-course-tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; margin: 1px; background: #E8DAEF; color: #6C3483; }
+  .fs-sous-titre { font-size: 13px; color: #555; margin-bottom: 16px; }
+  .fs-section { margin-bottom: 14px; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+  .fs-section-header { background: #1A3A5C; color: #fff; padding: 7px 14px; font-weight: 700; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  .fs-section-body { padding: 10px 14px; }
+  .fs-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 4px; }
+  .fs-info-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .fs-info-val { font-size: 15px; font-weight: 700; color: #111; }
+  .fs-info-val.rouge { color: #C0392B; }
+  .fs-info-val.vert  { color: #1E8449; }
+  .fs-info-val.bleu  { color: #1A5276; }
+  .fs-comm-list { list-style: none; padding: 0; margin: 0; }
+  .fs-comm-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .fs-comm-list li:last-child { border-bottom: none; }
+  .fs-comm-list li::before { content: '▸ '; color: #E67E22; font-weight: 700; }
+  .fs-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; }
+  .fs-table th { background: #2C3E50; color: #fff; padding: 5px 7px; text-align: left; font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; }
+  .fs-table td { padding: 5px 7px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .fs-table tr:nth-child(even) td { background: #F8F9FA; }
+  .fs-radio-pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin: 1px; }
+  .fs-radio-pill.com { background: #D6EAF8; color: #1A5276; }
+  .fs-radio-pill.crs { background: #E0F7FA; color: #006064; }
+  .fs-radio-pill.cmv { background: #D5F5E3; color: #1E8449; }
+  .fs-empty { color: #aaa; font-style: italic; text-align: center; padding: 20px; }
+  .btn-fiche-print { background: #C0392B; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; margin-top: 16px; }
+  .btn-fiche-print:hover { background: #E74C3C; }
+
+  /* ============================================================
+     OVERLAY PIN — saisie.html
+     ============================================================ */
+  #pin-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--dark);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #pin-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px; padding: 2rem 2.5rem 2.5rem;
+    text-align: center; width: min(360px, 92vw);
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  #pin-logo { margin-bottom: .75rem; }
+  #pin-titre {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.6rem; font-weight: 700; letter-spacing: .08em;
+    color: #fff; margin: 0 0 .25rem; text-transform: uppercase;
+  }
+  #pin-sous-titre {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: .95rem; color: rgba(255,255,255,.5); margin: 0 0 1.5rem;
+  }
+  #pin-dots { display: flex; justify-content: center; gap: .75rem; margin-bottom: .75rem; }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.35); background: transparent;
+    transition: background .15s, border-color .15s;
+  }
+  .dot.active { background: var(--rouge); border-color: var(--rouge); }
+  .dot.dot-extra { opacity: 0.25; transform: scale(0.75); transition: opacity .2s, transform .2s, background .15s, border-color .15s; }
+  .dot.dot-extra.visible { opacity: 1; transform: scale(1); }
+  .dot.dot-extra.active  { opacity: 1; transform: scale(1); }
+  #pin-erreur {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: .9rem; color: #ff6b6b; min-height: 1.2em; margin: 0 0 1rem;
+  }
+  #pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+  .pin-key {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 1.4rem; font-weight: 600;
+    padding: .75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.08); color: #fff; cursor: pointer;
+    transition: background .12s, transform .08s;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .pin-key:active:not(:disabled) { background: rgba(255,255,255,.18); transform: scale(.93); }
+  .pin-key:disabled { opacity: .35; cursor: default; }
+  .pin-key--efface { font-size: 1.2rem; }
+  .pin-key--ok {
+    background: var(--rouge); border-color: var(--rouge-vif);
+    font-size: 1.1rem; letter-spacing: .05em;
+  }
+  .pin-key--ok:not(:disabled):hover { background: var(--rouge-vif); }
+  #pin-chargement {
+    font-family: 'Barlow Condensed', sans-serif;
+    color: rgba(255,255,255,.55); font-size: .9rem; margin-top: .75rem;
+  }
+  @keyframes pinShake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+  .pin-shake { animation: pinShake .4s ease; }
+
+  @page report { size:A4 landscape; margin:8mm; }
+</style>
+</head>
+<body>
+
+<!-- OVERLAY PIN — affiché avant tout contenu si PIN configuré -->
+<div id="pin-overlay">
+  <div id="pin-card">
+    <div id="pin-logo">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="12" fill="var(--rouge)"/>
+        <path d="M24 10L36 17V31L24 38L12 31V17L24 10Z" stroke="white" stroke-width="2.5" fill="none"/>
+        <circle cx="24" cy="24" r="5" fill="white"/>
+      </svg>
+    </div>
+    <p id="pin-titre">ROC D'AZUR</p>
+    <p id="pin-sous-titre">Accès sécurisé — saisissez le code</p>
+    <div id="pin-dots">
+      <span class="dot" id="d0"></span>
+      <span class="dot" id="d1"></span>
+      <span class="dot" id="d2"></span>
+      <span class="dot" id="d3"></span>
+      <span class="dot dot-extra" id="d4"></span>
+      <span class="dot dot-extra" id="d5"></span>
+      <span class="dot dot-extra" id="d6"></span>
+      <span class="dot dot-extra" id="d7"></span>
+    </div>
+    <p id="pin-erreur" aria-live="polite"></p>
+    <div id="pin-pad">
+      <button class="pin-key" data-v="1">1</button>
+      <button class="pin-key" data-v="2">2</button>
+      <button class="pin-key" data-v="3">3</button>
+      <button class="pin-key" data-v="4">4</button>
+      <button class="pin-key" data-v="5">5</button>
+      <button class="pin-key" data-v="6">6</button>
+      <button class="pin-key" data-v="7">7</button>
+      <button class="pin-key" data-v="8">8</button>
+      <button class="pin-key" data-v="9">9</button>
+      <button class="pin-key pin-key--efface" id="pin-efface" title="Effacer">⌫</button>
+      <button class="pin-key" data-v="0">0</button>
+      <button class="pin-key pin-key--ok" id="pin-valider" title="Valider" disabled>OK</button>
+    </div>
+    <p id="pin-chargement" hidden>Vérification…</p>
+  </div>
+</div>
+
+<!-- Script PIN — s'exécute avant le script principal -->
+<script>
+// ============================================================
+// MODULE PIN — saisie.html
+// ============================================================
+(function () {
+  'use strict';
+  var AS_URL      = APPS_SCRIPT_URL;   // définie tout en haut du fichier
+  var SESSION_KEY = 'pinOk';
+  var saisi       = '';
+  var overlay     = document.getElementById('pin-overlay');
+  var validerBtn  = document.getElementById('pin-valider');
+  var effaceBtn   = document.getElementById('pin-efface');
+  var erreurEl    = document.getElementById('pin-erreur');
+  var chargEl     = document.getElementById('pin-chargement');
+  var padEl       = document.getElementById('pin-pad');
+  var dots        = document.querySelectorAll('.dot');
+
+  // Session déjà validée → masquer immédiatement
+  if (sessionStorage.getItem(SESSION_KEY) === '1') { _cacher(); return; }
+
+  // Délégation clics pavé numérique
+  padEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('.pin-key');
+    if (!btn || btn.disabled) return;
+    if (btn === effaceBtn)       _effacer();
+    else if (btn === validerBtn) _soumettre();
+    else                         _ajouter(btn.dataset.v);
+  });
+
+  // Clavier physique
+  document.addEventListener('keydown', function (e) {
+    if (overlay.style.display === 'none') return;
+    if (e.key >= '0' && e.key <= '9') _ajouter(e.key);
+    else if (e.key === 'Backspace')    _effacer();
+    else if (e.key === 'Enter')        _soumettre();
+  });
+
+  function _ajouter(c) { if (saisi.length < 8) { saisi += c; _maj(); } }
+  function _effacer()  { if (saisi.length) { saisi = saisi.slice(0,-1); erreurEl.textContent=''; _maj(); } }
+  function _maj() {
+    // Dots 0-3 : toujours visibles, remplis selon saisie
+    // Dots 4-7 : apparaissent progressivement dès que la saisie dépasse 4 chiffres
+    dots.forEach(function(d, i) {
+      d.classList.toggle('active', i < saisi.length);
+      if (d.classList.contains('dot-extra')) {
+        // Visible dès qu'on a saisi au moins (i) chiffres (ex: d4 apparaît au 5e chiffre)
+        d.classList.toggle('visible', saisi.length > i);
+      }
+    });
+    validerBtn.disabled = saisi.length < 4;
+  }
+  // Relances automatiques (v29) : si Google ne livre pas la réponse, on retente sans effacer le code saisi.
+  function _soumettre(essai) {
+    essai = (typeof essai === 'number') ? essai : 1;
+    var NB_ESSAIS = 4;
+    if (saisi.length < 4) return;
+    if (AS_URL.indexOf('REMPLACER') === 0) { _onError('Adresse Apps Script non configurée (voir le haut du fichier saisie.html)'); return; }
+    var pin = saisi;
+    _setLoading(true);
+    chargEl.textContent = essai > 1 ? 'Vérification… (nouvel essai ' + essai + '/' + NB_ESSAIS + ')' : 'Vérification…';
+    // JSONP direct (callASRetry pas encore déclaré à ce stade du DOM)
+    var cbName = 'pinCb_' + Math.random().toString(36).slice(2);
+    var fini = false, timer = null;
+    var s = document.createElement('script');
+    function echec(msg) {
+      if (fini) return; fini = true;
+      clearTimeout(timer);
+      window[cbName] = function(){ try{ delete window[cbName]; }catch(e){} };   // réponse tardive : ignorée sans erreur
+      try{ s.remove(); }catch(e){}
+      if (essai < NB_ESSAIS) setTimeout(function(){ _soumettre(essai + 1); }, 1000);
+      else _onError(msg);
+    }
+    timer = setTimeout(function(){ echec('Timeout réseau — réessayez'); }, essai === 1 ? 20000 : 30000);
+    window[cbName] = function(data) {
+      if (fini) return; fini = true;
+      clearTimeout(timer); delete window[cbName]; _setLoading(false);
+      if (data.ok) { sessionStorage.setItem(SESSION_KEY,'1'); _cacher(); }
+      else { erreurEl.textContent='Code incorrect. Réessayez.'; _shake(); saisi=''; _maj(); }
+    };
+    s.src = AS_URL + '?action=verifyPin&pin=' + encodeURIComponent(pin) + '&callback=' + cbName;
+    s.onerror = function(){ echec('Erreur réseau'); };
+    document.head.appendChild(s);
+  }
+  function _onError(msg){ _setLoading(false); erreurEl.textContent=msg; saisi=''; _maj(); }
+  function _cacher()    { if (overlay) overlay.style.display='none'; }
+  function _setLoading(on){ chargEl.hidden=!on; padEl.querySelectorAll('.pin-key').forEach(function(b){ b.disabled=on; }); }
+  function _shake()     { var c=document.getElementById('pin-card'); c.classList.remove('pin-shake'); void c.offsetWidth; c.classList.add('pin-shake'); }
+})();
+</script>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="header-title">🚵 ROC D'AZUR <span id="anneeHeader"></span> — Saisie Bénévoles</div>
+    <div class="header-controls">
+      <div class="jour-selector" id="jourSelector"></div>
+      <span class="badge-conflicts" id="badgeConflicts">⚠ Conflits</span>
+      <button class="btn-action btn-add-secteur" onclick="addSecteur()">+ Secteur</button>
+      <label class="chk-tous" title="Afficher aussi les secteurs non activés ce jour dans REF_Secteurs"><input type="checkbox" id="chkTousSecteurs" onchange="toggleTousSecteurs(this.checked)"> tous les secteurs</label>
+      <button class="btn-action" style="background:#B7950B;color:#fff" onclick="openGaillarde()">🏔 LA_GAILLARDE</button>
+      <button class="btn-action" style="background:#E67E22;color:#fff" onclick="openFicheSecteur()">📄 Fiche Secteur</button>
+      <button class="btn-action" style="background:#1A5276;color:#fff" onclick="openFichesPS()">🖨 Fiches de Poste</button>
+      <button class="btn-action btn-report" onclick="openReport()">📋 Report Jx</button>
+      <button class="btn-action btn-pdf" onclick="saveDraft()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="date-bar">
+    <div class="date-label" id="dateLabel">J1</div>
+    <div class="stats-bar">
+      <div class="stat-item"><div class="stat-dot rouge"></div><span>PS actifs : <strong class="stat-val" id="statPS">0</strong></span></div>
+      <div class="stat-item"><div class="stat-dot vert"></div><span>Bénévoles : <strong class="stat-val" id="statBenv">0</strong></span></div>
+      <div class="stat-item"><div class="stat-dot jaune"></div><span>Véhicules : <strong class="stat-val" id="statVeh">0</strong></span></div>
+      <div class="stat-item" style="margin-left:12px;gap:8px">
+        <span style="font-size:11px;color:var(--texte2)">Radios :</span>
+        <span id="statCOM" class="radio-stat-pill com">COM 0/20</span>
+        <span id="statCRS" class="radio-stat-pill crs">CRS 0/15</span>
+        <span id="statCMV" class="radio-stat-pill cmv">CMV 0/10</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barre d'alertes A5/A6 -->
+  <div id="alertsBar"></div>
+
+  <div id="secteursContainer"></div>
+</main>
+
+<!-- REPORT OVERLAY — même style que Fiche Secteur -->
+<div class="fiche-sect-overlay" id="reportOverlay">
+
+  <div class="fiche-sect-panel">
+    <div class="fiche-sect-controls">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:#fff;letter-spacing:1px" id="reportTitle">ROC D'AZUR</span>
+      <button class="btn-fiche-print btn-print-report" onclick="imprimerReport()">🖨 Imprimer</button>
+      <button class="btn-close" onclick="closeReport()" style="margin-left:auto">✕</button>
+    </div>
+    <div class="fiche-sect-body" id="reportBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<!-- FICHE SECTEUR OVERLAY -->
+<div class="fiche-sect-overlay" id="ficheSectOverlay">
+  <div class="fiche-sect-panel">
+    <div class="fiche-sect-controls">
+      <label>Secteur</label>
+      <select id="fsSecteurSelect" onchange="renderFicheSecteur()"></select>
+      <label style="margin-left:8px">Jour</label>
+      <select id="fsJourSelect" onchange="fsChangeJour()"></select>
+      <button class="btn-fiche-print" onclick="imprimerFicheSecteur()">🖨 Imprimer</button>
+      <button class="btn-close" onclick="closeFicheSecteur()" style="margin-left:auto">✕</button>
+    </div>
+    <div class="fiche-sect-body" id="ficheSectBody">
+      <div class="fs-empty">Sélectionner un secteur et un jour</div>
+    </div>
+  </div>
+</div>
+
+<!-- FICHES DE POSTE OVERLAY (par PS) -->
+<div class="fiche-sect-overlay" id="fichesPSOverlay">
+  <div class="fiche-sect-panel" style="max-width:960px">
+    <div class="fiche-sect-controls">
+      <label>Secteur</label>
+      <select id="fpsSecteurSelect" onchange="fpsChangeSecteur()"></select>
+      <label style="margin-left:8px">Jour</label>
+      <select id="fpsJourSelect" onchange="fpsChangeJour()"></select>
+      <button class="btn-fiche-print" onclick="imprimerFichesPS()">🖨 Imprimer</button>
+      <button class="btn-close" onclick="closeFichesPS()" style="margin-left:auto">✕</button>
+    </div>
+    <!-- Sélecteur de PS -->
+    <div id="fpsBarre" style="background:var(--dark3);padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--texte2);text-transform:uppercase">PS à imprimer :</span>
+      <div id="fpsPSSelector" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <button onclick="fpsToutSelectionner()" style="margin-left:auto;background:var(--bleu);color:#fff;border:none;border-radius:4px;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px">TOUS</button>
+      <button onclick="fpsToutDeselectionner()" style="background:transparent;color:var(--texte2);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px">AUCUN</button>
+    </div>
+    <div class="fiche-sect-body" id="fichesPSBody">
+      <div class="fs-empty">Sélectionner un secteur et un jour</div>
+    </div>
+  </div>
+</div>
+
+<datalist id="dlCourses"></datalist>
+
+<script>
+// ========================================================
+// DATA — Référentiels (tout vient du Google Sheet)
+// ========================================================
+// Dates des jours : calculées à partir de CONFIG → DATE_J1 (J2 = J1 + 1 jour, etc.).
+// Tant que DATE_J1 n'est pas connue, les dates restent vides (et un avertissement s'affiche).
+const JOURS = [
+  { id: 'J1', label: 'J1', date: '' },
+  { id: 'J2', label: 'J2', date: '' },
+  { id: 'J3', label: 'J3', date: '' },
+  { id: 'J4', label: 'J4', date: '' },
+  { id: 'J5', label: 'J5', date: '' },
+];
+let ANNEE = '';          // ex. « 2027 », déduite de DATE_J1
+let DATE_J1_OK = false;  // true quand DATE_J1 est valide
+const NOMS_JOURS = ['DIMANCHE','LUNDI','MARDI','MERCREDI','JEUDI','VENDREDI','SAMEDI'];
+// Titre de l'événement pour les en-têtes imprimés : « ROC D'AZUR 2027 » (sans année si inconnue)
+function titreEvt() { return "ROC D'AZUR" + (ANNEE ? ' ' + ANNEE : ''); }
+// iso = « aaaa-mm-jj » (fourni par le script). Renvoie true si les dates ont été appliquées.
+function appliquerDateJ1(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+  if (!m) { DATE_J1_OK = false; ANNEE = ''; JOURS.forEach(j => { j.date = ''; }); majTitresAnnee(); return false; }
+  const base = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  JOURS.forEach((j, i) => {
+    const d = new Date(base + i * 86400000);
+    const jj = String(d.getUTCDate()).padStart(2, '0'), mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    j.date = NOMS_JOURS[d.getUTCDay()] + ' ' + jj + '/' + mm + '/' + d.getUTCFullYear();
+  });
+  ANNEE = String(m[1]);
+  DATE_J1_OK = true;
+  majTitresAnnee();
+  return true;
+}
+function majTitresAnnee() {
+  const h = document.getElementById('anneeHeader'); if (h) h.textContent = ANNEE;
+  document.title = titreEvt() + ' — Saisie Bénévoles';
+}
+
+// Alimenté au chargement depuis Google Sheets : onglet REF_Secteurs, colonne NOM_SECTEUR (A).
+// Pour modifier la liste : éditer le Sheet, jamais ce fichier. Ordre = ordre du Sheet.
+// ⚠ 'LA_GAILLARDE' doit rester écrit exactement ainsi dans le Sheet (clé du module LG).
+const SECTEURS = [];
+
+// Valeur déjà enregistrée mais absente de la liste actuelle du Sheet (ex. renommage) :
+// on la garde visible et sélectionnée, marquée « hors liste », plutôt que de la perdre.
+function orphanOpt(list, val) {
+  if (!val || !list.length || list.includes(val)) return '';
+  return `<option value="${val}" selected>${val} ⚠ hors liste</option>`;
+}
+
+const REFERANTS = [];   // alimenté depuis Sheets (colonne REFERENT = X de REF_Benevoles)
+
+// Alimenté au chargement depuis Google Sheets : onglet REF_Vehicules, colonne NOM_VEHICULE (B).
+// Pour modifier la flotte : éditer le Sheet, jamais ce fichier. Ordre = ordre du Sheet.
+const VEHICULES = [];
+
+const HEURES_MEP = [
+  '5h45','6h00','6h15','6h30','6h45','7h00','7h15','7h30',
+  '7h45','8h00','8h15','8h30','8h45','9h00','9h15','9h30',
+  '9h45','10h00','10h15','10h30','10h45','11h00','11h15','11h30',
+  '11h45','12h00','12h15','12h30','12h45','13h00','13h15','13h30',
+  '13h45','14h00','14h15','14h30','14h45','15h00',
+];
+
+const BENEVOLES = [];   // alimenté depuis Sheets (REF_Benevoles)
+const BENEVOLES_DATA = []; // {nom, label, tel} — alimenté depuis Sheets
+// Map NOM seul → label complet (NOM+PRENOM) — pour l'affichage dans les selects
+// ex: { 'Bénévole_003': 'Bénévole_003 Corinne' }
+// Valeur stockée dans BENEVOLE_x = NOM seul ; affichage = label complet
+const BENEVOLES_LABEL = {};
+// Cumul des libellés NOM+PRENOM vus (tous jours confondus + liste complète fournie par le serveur) :
+// sert aux fiches imprimées (Fiches PS, Fiche Secteur, Report) qui peuvent concerner un jour ≠ jour chargé
+// ou un bénévole non disponible ce jour-là. Jamais vidé.
+const BENEVOLES_LABEL_CUMUL = {};
+// Libellé d'affichage d'un bénévole/référent stocké (NOM seul ou « NOM Prénom » si homonyme).
+// LA_GAILLARDE : jamais transformé (module validé, fiches déjà prêtes).
+function nomAff(n, secteur) {
+  if (!n) return n;
+  if (secteur === 'LA_GAILLARDE') return n;
+  return BENEVOLES_LABEL[n] || BENEVOLES_LABEL_CUMUL[n] || n;
+}
+
+// PS par secteur : alimenté au chargement depuis Google Sheets (REF_PS). Aucune liste en dur (celles de 2026 seraient fausses en 2027).
+const PS_SECTEUR = {};
+
+// Aucune donnée pré-remplie : tout vient du Google Sheet (onglet SAISIE) ou du brouillon local.
+const PRELOAD = {};
+
+// ========================================================
+// STATE
+// ========================================================
+let currentJour = 'J1';
+let state = {}; // { J1: [{secteur, referant, hmepSect, rows:[...]}], ... }
+
+function initState() {
+  JOURS.forEach(j => {
+    if (PRELOAD[j.id]) {
+      state[j.id] = JSON.parse(JSON.stringify(PRELOAD[j.id]));
+    } else {
+      state[j.id] = [];
+    }
+  });
+}
+
+// ========================================================
+// RENDER
+// ========================================================
+function buildSelect(options, selected, placeholder, cls) {
+  let html = `<select class="${cls}"><option value="">${placeholder}</option>`;
+  options.forEach(o => {
+    const val = typeof o === 'object' ? o.nom : o;
+    html += `<option value="${val}" ${val === selected ? 'selected' : ''}>${val}</option>`;
+  });
+  html += '</select>';
+  return html;
+}
+
+// ========================================================
+// SECTEURS / PS SOUPLES (v20) — Tous Secteurs uniquement. Le module LA_GAILLARDE n'utilise rien de ce bloc.
+// ========================================================
+const SECTEURS_JOURS = {};   // nom secteur → null (actif tous les jours) ou ['J2','J3',…] (colonnes J1–J5 de REF_Secteurs)
+let   SECTEURS_TOUS  = false; // case « tous les secteurs » : ignore l'activation par jour
+const PS_TOUS        = [];   // [{label, secteur}] — PS du jour hors LA_GAILLARDE (groupe « Autres PS »)
+const SOLO_VIDE      = 'PS ?';
+const attrEsc  = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const normTxt  = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+const normCle  = v => normTxt(v).toUpperCase();
+const estSolo  = nom => /^PS(\s|$)/i.test(String(nom || ''));          // bloc « PS sans secteur » (nommé « PS 140 »)
+const secteurActif = (nom, jour) => { const j = SECTEURS_JOURS[nom]; return !j || j.includes(jour); };
+
+// Numéros couverts par un libellé de PS (même logique que l'Apps Script).
+// « 128 - 124 127 & 127 - LA DOMI » → 128,124,127 ; « 131 a 139 » → 131…139 ; le « 3 » de « 120 - 3 CHEMINS » est ignoré.
+function parsePS(label) {
+  const out = [];
+  const add = (n, bis) => { n = parseInt(n, 10); if (n > 0 && !out.some(o => o.n === n && o.bis === bis)) out.push({ n, bis }); };
+  const segs = normTxt(label).split(/\s[-–]\s/);
+  const num  = seg => /^(?:\d+|&|\+|à|a|bis|,)(?: (?:\d+|&|\+|à|a|bis|,))*$/i.test(seg.trim());
+  let prefix = '';
+  for (let i = 0; i < segs.length; i++) {
+    if (i === 0 ? (/^\d/.test(segs[i]) && num(segs[i])) : num(segs[i])) prefix += ' ' + segs[i]; else break;
+  }
+  prefix = prefix.replace(/(\d+)\s+(?:à|a)\s+(\d+)/gi, (m, a, b) => {
+    for (let k = parseInt(a, 10); k <= parseInt(b, 10) && k < parseInt(a, 10) + 60; k++) add(k, false);
+    return ' ';
+  });
+  const re = /(\d+)(?:\s+(bis))?/gi; let m;
+  while ((m = re.exec(prefix))) add(m[1], !!m[2]);
+  if (!out.length) { const f = String(label || '').match(/\d+/); if (f) add(f[0], false); }
+  return out;
+}
+const numsDuPS = label => [...new Set(parsePS(label).map(o => o.n))];
+const clesPS   = label => parsePS(label).map(o => o.n + (o.bis ? 'BIS' : ''));
+// PS 30 à 41 = module LA_GAILLARDE uniquement
+const estPSLG  = label => { const p = parsePS(label)[0]; return !!p && p.n >= 30 && p.n <= 41; };
+// « 117 BIS - INTERSECTION… » → « PS 117 BIS »
+const soloNom  = label => 'PS ' + normTxt(String(label || '').split(/\s[-–]\s/)[0]);
+
+// Liste des PS d'un secteur (clé exacte, sinon comparaison sans casse ni espaces superflus)
+function psDuSecteur(nom) {
+  if (PS_SECTEUR[nom]) return PS_SECTEUR[nom];
+  const k = normCle(nom);
+  const key = Object.keys(PS_SECTEUR).find(x => normCle(x) === k);
+  return key ? PS_SECTEUR[key] : [];
+}
+// PS déjà saisis ce jour : libellé → secteur (en excluant la ligne en cours d'édition)
+function psUtilises(exSi, exRi) {
+  const m = {};
+  (state[currentJour] || []).forEach((sec, si) => (sec.rows || []).forEach((r, ri) => {
+    if (!r.ps || (si === exSi && ri === exRi)) return;
+    if (!m[r.ps]) m[r.ps] = sec.secteur;
+  }));
+  return m;
+}
+function psOptionsHtml(secteur, selected, si, ri) {
+  const own  = psDuSecteur(secteur);
+  const used = psUtilises(si, ri);
+  const mk   = lab => used[lab] ? ` ⚠ déjà saisi (${used[lab]})` : '';
+  const solo = estSolo(secteur);
+  let h = `<option value="">— choisir PS —</option>`;
+  h += `<option value="__LIBRE__" style="font-weight:700">✎ PS non listé… (saisir)</option>`;   // en tête : évite de descendre au bas de la liste
+  own.forEach(ps => { h += `<option value="${attrEsc(ps)}" ${ps === selected ? 'selected' : ''}>${ps}${mk(ps)}</option>`; });
+  const ownSet = new Set(own);
+  const autres = PS_TOUS.filter(p => !ownSet.has(p.label));
+  if (autres.length) {
+    h += `<optgroup label="${solo ? 'Tous les PS' : 'Autres PS (hors secteur)'}">`;
+    autres.forEach(p => {
+      h += `<option value="${attrEsc(p.label)}" ${p.label === selected ? 'selected' : ''}>${p.label} · ${p.secteur || 'sans secteur'}${mk(p.label)}</option>`;
+    });
+    h += `</optgroup>`;
+  }
+  if (selected && !ownSet.has(selected) && !autres.some(p => p.label === selected)) {
+    h += `<option value="${attrEsc(selected)}" selected>${selected} ✎ hors liste</option>`;
+  }
+  return h;
+}
+function sectOptionsHtml(si) {
+  const cur    = state[currentJour][si].secteur;
+  const prises = new Set(state[currentJour].filter((x, i) => i !== si).map(x => x.secteur));
+  const liste  = SECTEURS.filter(n => n !== 'LA_GAILLARDE' && (SECTEURS_TOUS || secteurActif(n, currentJour) || n === cur));
+  let h = `<option value="__SOLO__" style="font-weight:700">✚ PS sans secteur (nom = n° du PS)</option>`;   // en tête de liste
+  h += liste.map(n => {
+    const dis = prises.has(n) ? 'disabled' : '';
+    const inactif = secteurActif(n, currentJour) ? '' : ' (inactif ce jour)';
+    return `<option value="${attrEsc(n)}" ${n === cur ? 'selected' : ''} ${dis}>${n}${inactif}${prises.has(n) ? ' — déjà ajouté' : ''}</option>`;
+  }).join('');
+  if (cur && !liste.includes(cur)) {
+    h += estSolo(cur) ? `<option value="${attrEsc(cur)}" selected>${cur}</option>`
+                      : `<option value="${attrEsc(cur)}" selected>${cur} ⚠ hors liste</option>`;
+  }
+  return h;
+}
+function toggleTousSecteurs(v) { SECTEURS_TOUS = !!v; renderAll(); }
+// Menus « secteur » de tous les blocs remis à jour (un secteur pris/libéré ailleurs change leurs options grisées)
+function refreshSectSelects() {
+  (state[currentJour] || []).forEach((x, i) => {
+    const sel = document.querySelector(`#sect-${i} .secteur-name-select`);
+    if (sel) sel.innerHTML = sectOptionsHtml(i);
+  });
+}
+function rerenderSecteur(si) { renderSecteur(si); refreshSectSelects(); updateStats(); }
+function refreshRowPS(si, ri) {
+  const tr = document.getElementById(`row-${si}-${ri}`);
+  const det = document.getElementById(`det-${si}-${ri}`);
+  if (det) det.remove();
+  if (tr) tr.outerHTML = renderPSRow(si, ri, state[currentJour][si].rows[ri], state[currentJour][si].secteur);
+}
+// Changement du PS d'une ligne : PS non listé, bloc « PS sans secteur » nommé d'après le PS
+function onPSChange(si, ri, sel) {
+  const sec = state[currentJour][si];
+  const row = sec.rows[ri];
+  let v = sel.value;
+  if (v === '__LIBRE__') {
+    v = normTxt(prompt('PS non listé — saisir le libellé complet en commençant par le numéro.\nEx. : 145 BIS - NOM DU LIEU', ''));
+    if (!v) { refreshRowPS(si, ri); return; }
+    if (!/^\d/.test(v)) { toast('Le libellé doit commencer par le numéro du PS', 'warn'); refreshRowPS(si, ri); return; }
+    if (estPSLG(v))     { toast('PS 30 à 41 : réservés au module LA_GAILLARDE', 'err'); refreshRowPS(si, ri); return; }
+  }
+  if (estSolo(sec.secteur)) {
+    const autres = state[currentJour].filter((x, i) => i !== si).map(x => x.secteur);
+    const nom = v ? soloNom(v) : SOLO_VIDE;
+    if (v && autres.includes(nom)) { toast(`${nom} est déjà saisi dans un autre bloc ce jour`, 'warn'); refreshRowPS(si, ri); return; }
+    row.ps = v;
+    appliquerAuto(row, false);
+    if (nom === SOLO_VIDE && autres.includes(SOLO_VIDE)) { refreshRowPS(si, ri); updateStats(); checkConflicts(); return; }
+    sec.secteur = nom;
+    rerenderSecteur(si);
+    if (v) toast(`Bloc nommé « ${nom} »`);
+    checkConflicts();
+    return;
+  }
+  row.ps = v;
+  appliquerAuto(row, false);                                   // courses / km proposés automatiquement s'ils sont connus
+  if (sel.value === '__LIBRE__') refreshRowPS(si, ri); else refreshDet(si, ri);
+  updateStats(); checkConflicts();
+}
+
+function buildPSOptions(secteur, selected) {
+  const list = PS_SECTEUR[secteur] || [];
+  let html = `<select class="ps-select" style="width:100%"><option value="">— choisir PS —</option>`;
+  list.forEach(ps => {
+    html += `<option value="${ps}" ${ps === selected ? 'selected' : ''}>${ps}</option>`;
+  });
+  html += `<option value="${selected}" ${selected && !list.includes(selected) ? 'selected' : ''}>${selected && !list.includes(selected) ? selected : ''}</option>`;
+  // allow free text fallback
+  html += '</select>';
+  return html;
+}
+
+function renderJours() {
+  const container = document.getElementById('jourSelector');
+  container.innerHTML = JOURS.map(j =>
+    `<button class="btn-jour ${j.id === currentJour ? 'active' : ''}" onclick="switchJour('${j.id}')">${j.label}</button>`
+  ).join('');
+}
+
+function renderAll() {
+  renderJours();
+  const dateInfo = JOURS.find(j => j.id === currentJour);
+  document.getElementById('dateLabel').textContent = DATE_J1_OK
+    ? `${dateInfo.date} — ${currentJour}`
+    : `${currentJour} — ⚠ dates inconnues : renseigner DATE_J1 dans l'onglet CONFIG`;
+  document.getElementById('secteursContainer').innerHTML = '';
+  const secteurs = state[currentJour] || [];
+  secteurs.forEach((s, si) => renderSecteur(si));
+  updateStats();
+  checkConflicts();
+}
+
+function renderSecteur(si) {
+  const container = document.getElementById('secteursContainer');
+  const s = state[currentJour][si];
+  const refObj = REFERANTS.find(r => r.nom === s.referant);
+  const tel = refObj ? refObj.tel : '';
+  const collapsed = s.collapsed ? 'collapsed' : '';
+
+  const div = document.createElement('div');
+  div.className = `secteur-bloc ${collapsed}${estSolo(s.secteur) ? ' solo' : ''}`;
+  div.id = `sect-${si}`;
+
+  // build PS table rows
+  let rowsHtml = '';
+  (s.rows || []).forEach((row, ri) => {
+    rowsHtml += renderPSRow(si, ri, row, s.secteur);
+  });
+
+  // secteur name options
+  let sectOpts = sectOptionsHtml(si);
+
+  // referant options — value = NOM seul, texte = NOM+PRENOM si dispo
+  let refOpts = `<option value="">— Référant —</option>` + REFERANTS.map(r => {
+    const label = BENEVOLES_LABEL[r.nom] || r.nom;
+    return `<option value="${r.nom}" ${r.nom === s.referant ? 'selected' : ''}>${label}</option>`;
+  }).join('');
+
+  // heure mep options
+  let heureOpts = `<option value="">— H MeP —</option>` + HEURES_MEP.map(h =>
+    `<option value="${h}" ${h === s.hmepSect ? 'selected' : ''}>${h}</option>`
+  ).join('');
+
+  div.innerHTML = `
+    <div class="secteur-header" onclick="toggleCollapse(${si}, event)">
+      <div class="secteur-num">${si + 1}</div>
+      <select class="secteur-name-select" onchange="changeSecteur(${si}, this.value)" onclick="event.stopPropagation()">
+        ${sectOpts}
+      </select>
+      <div class="secteur-meta">
+        <div class="meta-field">
+          <label>Référant</label>
+          <select class="meta-select" onchange="changeReferant(${si}, this.value)" onclick="event.stopPropagation()">
+            ${refOpts}
+          </select>
+        </div>
+        <div class="meta-field">
+          <span class="meta-tel" id="tel-${si}">${tel ? '📞 ' + tel : ''}</span>
+        </div>
+        <div class="meta-field">
+          <label>H MeP sect.</label>
+          <select class="meta-select" style="width:80px" onchange="changeHmepSect(${si}, this.value)" onclick="event.stopPropagation()">
+            ${heureOpts}
+          </select>
+        </div>
+      </div>
+      <div class="secteur-actions" onclick="event.stopPropagation()">
+        <button class="btn-sm success" onclick="addPS(${si})">+ PS</button>
+        <button class="btn-sm danger" onclick="removeSecteur(${si})">✕</button>
+        <span class="toggle-icon">▾</span>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="ps-table">
+        <thead>
+          <tr>
+            <th style="width:28px">#</th>
+            <th class="col-ps">SITE / POINT SIGNALEUR</th>
+            <th class="col-hmep">H MeP</th>
+            <th class="col-veh">VÉH A</th>
+            <th class="col-veh">VÉH B</th>
+            <th class="col-benv">BÉNÉVOLE 1</th>
+            <th class="col-benv">BÉNÉVOLE 2</th>
+            <th class="col-benv">BÉNÉVOLE 3</th>
+            <th class="col-radio col-radios">COM</th>
+            <th class="col-radio col-radios">CRS</th>
+            <th class="col-radio col-radios">CMV</th>
+            <th class="col-obs">OBSERVATIONS</th>
+            <th class="col-det" title="Détails du PS : personnes 4 et 5, mise en place, km, courses, 1er participant, commentaires">DÉTAILS</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="rows-${si}">${rowsHtml}</tbody>
+      </table>
+      <button class="btn-add-ps" onclick="addPS(${si})">＋ Ajouter un point signaleur</button>
+    </div>
+    <div class="secteur-commentaires">
+      <div class="commentaires-label" id="comm-label-${si}">📝 Commentaires pour le référant <strong>${s.secteur}</strong></div>
+      <div class="commentaires-grid">
+        ${[0,1,2].map(ci => `
+          <div class="comment-row">
+            <span class="comment-num">${ci+1}.</span>
+            <input type="text" class="comment-input ${(s.commentaires||[])[ci] ? 'has-value' : ''}"
+              placeholder="Commentaire ${ci+1}…"
+              value="${((s.commentaires||[])[ci] || '').replace(/"/g,'&quot;')}"
+              oninput="updateCommentaire(${si},${ci},this.value); this.classList.toggle('has-value', !!this.value)">
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+  const ancien = document.getElementById(`sect-${si}`);
+  if (ancien && ancien.parentNode === container) container.replaceChild(div, ancien); else container.appendChild(div);
+}
+
+function renderPSRow(si, ri, row, secteur) {
+  // value = NOM seul (ce qui est stocké dans state et dans Sheets)
+  // texte affiché = NOM+PRENOM si disponible dans BENEVOLES_LABEL, sinon NOM seul
+  const benvOpts = (val) => `<option value="">—</option>` + BENEVOLES.map(b => {
+    const label = BENEVOLES_LABEL[b] || b;
+    return `<option value="${b}" ${b === val ? 'selected' : ''}>${label}</option>`;
+  }).join('');
+  const vehOpts = (val) => `<option value="">—</option>` + VEHICULES.map(v =>
+    `<option value="${v}" ${v === val ? 'selected' : ''}>${v}</option>`
+  ).join('') + orphanOpt(VEHICULES, val);
+  const heureOpts = (val) => `<option value="">—</option>` + HEURES_MEP.map(h =>
+    `<option value="${h}" ${h === val ? 'selected' : ''}>${h}</option>`
+  ).join('');
+
+  // PS select
+  const psOpts = psOptionsHtml(secteur, row.ps, si, ri);
+
+  return `
+    <tr id="row-${si}-${ri}" data-si="${si}" data-ri="${ri}">
+      <td class="col-num">${ri + 1}</td>
+      <td class="col-ps">
+        <select onchange="onPSChange(${si},${ri},this)" class="ps-select">
+          ${psOpts}
+        </select>
+      </td>
+      <td class="col-hmep">
+        <select onchange="updateRow(${si},${ri},'hmep',this.value)">
+          ${heureOpts(row.hmep)}
+        </select>
+      </td>
+      <td class="col-veh">
+        <select onchange="updateRow(${si},${ri},'vehA',this.value)">
+          ${vehOpts(row.vehA)}
+        </select>
+      </td>
+      <td class="col-veh">
+        <select onchange="updateRow(${si},${ri},'vehB',this.value)">
+          ${vehOpts(row.vehB)}
+        </select>
+      </td>
+      <td class="col-benv" id="benv-${si}-${ri}-1">
+        <select onchange="updateRow(${si},${ri},'b1',this.value)">
+          ${benvOpts(row.b1)}
+        </select>
+      </td>
+      <td class="col-benv" id="benv-${si}-${ri}-2">
+        <select onchange="updateRow(${si},${ri},'b2',this.value)">
+          ${benvOpts(row.b2)}
+        </select>
+      </td>
+      <td class="col-benv" id="benv-${si}-${ri}-3">
+        <select onchange="updateRow(${si},${ri},'b3',this.value)">
+          ${benvOpts(row.b3)}
+        </select>
+      </td>
+      <td class="col-radio">
+        <input type="number" class="radio-num com ${(row.com||0)>0?'has-value':''}" min="0" max="9"
+          value="${(row.com||0)>0 ? row.com : ''}" placeholder="0" title="Nb radios COM"
+          onchange="updateRow(${si},${ri},'com',+this.value||0); this.classList.toggle('has-value',+this.value>0)">
+      </td>
+      <td class="col-radio">
+        <input type="number" class="radio-num crs ${(row.crs||0)>0?'has-value':''}" min="0" max="9"
+          value="${(row.crs||0)>0 ? row.crs : ''}" placeholder="0" title="Nb radios CRS"
+          onchange="updateRow(${si},${ri},'crs',+this.value||0); this.classList.toggle('has-value',+this.value>0)">
+      </td>
+      <td class="col-radio">
+        <input type="number" class="radio-num cmv ${(row.cmv||0)>0?'has-value':''}" min="0" max="9"
+          value="${(row.cmv||0)>0 ? row.cmv : ''}" placeholder="0" title="Nb radios CMV"
+          onchange="updateRow(${si},${ri},'cmv',+this.value||0); this.classList.toggle('has-value',+this.value>0)">
+      </td>
+      <td class="col-obs">
+        <input type="text" placeholder="Obs…" value="${row.obs || ''}"
+          oninput="updateRow(${si},${ri},'obs',this.value)">
+      </td>
+      <td class="col-det">${detBoutonHtml(si, ri, row)}</td>
+      <td class="col-del">
+        <button class="btn-del-row" onclick="deleteRow(${si},${ri})" title="Supprimer">✕</button>
+      </td>
+    </tr>
+    <tr id="det-${si}-${ri}" class="det-row" style="display:${row._det ? 'table-row' : 'none'}">
+      <td colspan="14" id="detc-${si}-${ri}">${row._det ? detHtml(si, ri, row) : ''}</td>
+    </tr>
+  `;
+}
+
+// ========================================================
+// VOLET « DÉTAILS » D'UN PS
+// Personnes 4 et 5, mise en place, km ravitaillement / atelier, courses, 1er participant, commentaires.
+// Courses et km : proposés AUTOMATIQUEMENT quand le PS est connu de REF_Courses (PS_CONCERNES) / REF_KM,
+// sinon saisie au clavier. Une valeur tapée à la main n'est jamais écrasée (sauf bouton « ↺ valeurs automatiques »).
+// ========================================================
+let COURSES_REF = [];   // [{nom, jours, ps:[n°], couleur}]  — REF_Courses
+let KM_REF      = [];   // [{num, ravit, atelier}] du jour courant — REF_KM
+
+function nomsCoursesDuJour() {
+  const actives = COURSES_REF.filter(c => Array.isArray(c.jours) && c.jours.includes(currentJour)).map(c => c.nom);
+  return actives.length ? actives : COURSES_REF.map(c => c.nom);   // aucune course avec Jx renseigné : toutes
+}
+function majDatalistCourses() {
+  const dl = document.getElementById('dlCourses');
+  if (dl) dl.innerHTML = nomsCoursesDuJour().map(n => `<option value="${attrEsc(n)}">`).join('');
+}
+function coursesAuto(psLabel) {
+  const nums = numsDuPS(psLabel || '');
+  if (!nums.length) return [];
+  const out = [];
+  COURSES_REF.forEach(c => {
+    if (!Array.isArray(c.jours) || !c.jours.includes(currentJour) || !Array.isArray(c.ps)) return;
+    if (nums.some(n => c.ps.includes(n)) && !out.includes(c.nom)) out.push(c.nom);
+  });
+  return out.slice(0, 4);
+}
+function kmAuto(psLabel) {
+  const nums = numsDuPS(psLabel || '');
+  for (const n of nums) {
+    const k = KM_REF.find(x => (String(x.num).match(/\d+/g) || []).map(Number).includes(n));
+    if (k) return { ravit: String(k.ravit || ''), atelier: String(k.atelier || '') };
+  }
+  return null;
+}
+// Applique les valeurs automatiques à une ligne. force=false : seulement si la ligne n'a pas de valeur saisie à la main.
+function appliquerAuto(row, force) {
+  if (!row) return;
+  if (!Array.isArray(row.courses)) row.courses = [];
+  const ca = coursesAuto(row.ps);
+  const vide = !row.courses.some(Boolean);
+  if (force || vide || row._autoC) {
+    if (ca.length) { row.courses = ca; row._autoC = true; }
+    else if (row._autoC || force) { row.courses = []; row._autoC = false; }
+  }
+  const ka = kmAuto(row.ps);
+  const videK = !row.kmRavit && !row.kmAtelier;
+  if (force || videK || row._autoK) {
+    if (ka) { row.kmRavit = ka.ravit; row.kmAtelier = ka.atelier; row._autoK = true; }
+    else if (row._autoK || force) { row.kmRavit = ''; row.kmAtelier = ''; row._autoK = false; }
+  }
+}
+function nbDetailsRemplis(row) {
+  if (!row) return 0;
+  return [row.kmRavit, row.kmAtelier, row.mepPar, row.mepLieu, row.hmepRdv, row.premierPart, row.commA, row.commB]
+    .filter(Boolean).length + ((row.courses || []).filter(Boolean).length ? 1 : 0);
+}
+function detBoutonInner(row) {
+  const plus = (row.b4 ? 1 : 0) + (row.b5 ? 1 : 0);
+  return '▾' + (plus ? ` <b>+${plus}</b>` : '') + (nbDetailsRemplis(row) ? ' ●' : '');
+}
+function detBoutonHtml(si, ri, row) {
+  const rempli = ((row.b4 || row.b5) || nbDetailsRemplis(row)) ? ' rempli' : '';
+  return `<button type="button" class="btn-det${row._det ? ' ouvert' : ''}${rempli}" id="det-btn-${si}-${ri}" onclick="toggleDet(${si},${ri})"
+    title="Détails : personnes 4 et 5, mise en place, km, courses, 1er participant, commentaires">${detBoutonInner(row)}</button>`;
+}
+function majBoutonDet(si, ri) {
+  const row = state[currentJour][si] && state[currentJour][si].rows[ri];
+  const b = document.getElementById(`det-btn-${si}-${ri}`);
+  if (!row || !b) return;
+  b.innerHTML = detBoutonInner(row);
+  b.classList.toggle('rempli', !!(row.b4 || row.b5 || nbDetailsRemplis(row)));
+}
+function benvOptsHtml(val) {
+  return `<option value="">—</option>` + BENEVOLES.map(b => {
+    const label = BENEVOLES_LABEL[b] || b;
+    return `<option value="${attrEsc(b)}" ${b === val ? 'selected' : ''}>${label}</option>`;
+  }).join('') + orphanOpt(BENEVOLES, val);
+}
+function heureOptsHtml(val) {
+  return `<option value="">—</option>` + HEURES_MEP.map(h => `<option value="${h}" ${h === val ? 'selected' : ''}>${h}</option>`).join('');
+}
+function detHtml(si, ri, row) {
+  const v = x => attrEsc(x == null ? '' : String(x));
+  const cs = Array.isArray(row.courses) ? row.courses : [];
+  const f = (lab, inner, extra) => `<div class="det-field" ${extra || ''}><label>${lab}</label>${inner}</div>`;
+  const a = `onchange="updateRow(${si},${ri},`;
+  return `<div class="det-box">
+    <div class="det-sec">👤 Personnes en plus</div>
+    <div class="det-grid det-g4">
+      <div class="det-field" id="benv-${si}-${ri}-4"><label>Bénévole 4</label><select ${a}'b4',this.value)">${benvOptsHtml(row.b4)}</select></div>
+      <div class="det-field" id="benv-${si}-${ri}-5"><label>Bénévole 5</label><select ${a}'b5',this.value)">${benvOptsHtml(row.b5)}</select></div>
+    </div>
+    <div class="det-sec">🚩 Mise en place</div>
+    <div class="det-grid det-g3">
+      ${f('Mise en place par', `<select ${a}'mepPar',this.value)">${benvOptsHtml(row.mepPar)}</select>`)}
+      ${f('Lieu de RDV MeP', `<input type="text" value="${v(row.mepLieu)}" placeholder="ex : Parking Fournel" oninput="updateRow(${si},${ri},'mepLieu',this.value)">`)}
+      ${f('Heure RDV MeP', `<select ${a}'hmepRdv',this.value)">${heureOptsHtml(row.hmepRdv)}</select>`)}
+    </div>
+    <div class="det-sec">📍 Distances${row._autoK ? '<span class="det-auto">auto (REF_KM)</span>' : ''}</div>
+    <div class="det-grid det-g2">
+      ${f('Ravitaillement (km)', `<input type="text" inputmode="decimal" value="${v(row.kmRavit)}" placeholder="ex : 3,5" oninput="detSaisieKm(${si},${ri},'kmRavit',this.value)">`)}
+      ${f('Assistance / atelier (km)', `<input type="text" inputmode="decimal" value="${v(row.kmAtelier)}" placeholder="ex : 7,2" oninput="detSaisieKm(${si},${ri},'kmAtelier',this.value)">`)}
+    </div>
+    <div class="det-sec">🏁 Courses du jour &amp; 1er participant${row._autoC ? '<span class="det-auto">auto (REF_Courses)</span>' : ''}</div>
+    <div class="det-grid det-g4">
+      ${[0,1,2,3].map(k => f('Course ' + (k + 1), `<input type="text" list="dlCourses" value="${v(cs[k] || '')}" placeholder="Nom course…" onchange="detSaisieCourse(${si},${ri},${k},this.value)">`)).join('')}
+    </div>
+    <div class="det-grid det-g4" style="padding-top:0">
+      ${f('1er participant vers', `<select ${a}'premierPart',this.value)">${heureOptsHtml(row.premierPart)}</select>`)}
+    </div>
+    <div class="det-sec">📝 Commentaires</div>
+    <div class="det-grid det-g2">
+      ${f('Commentaire A', `<input type="text" value="${v(row.commA)}" placeholder="Commentaire A…" oninput="updateRow(${si},${ri},'commA',this.value)">`)}
+      ${f('Commentaire B', `<input type="text" value="${v(row.commB)}" placeholder="Commentaire B…" oninput="updateRow(${si},${ri},'commB',this.value)">`)}
+    </div>
+    <div class="det-pied"><button type="button" onclick="detReprendreAuto(${si},${ri})" title="Remplace les courses et les km par ceux de REF_Courses / REF_KM pour ce PS">↺ Reprendre les valeurs automatiques</button></div>
+  </div>`;
+}
+function toggleDet(si, ri) {
+  const row = state[currentJour][si].rows[ri];
+  row._det = !row._det;
+  const tr = document.getElementById(`det-${si}-${ri}`), c = document.getElementById(`detc-${si}-${ri}`), b = document.getElementById(`det-btn-${si}-${ri}`);
+  if (!tr || !c) return;
+  if (row._det) { c.innerHTML = detHtml(si, ri, row); tr.style.display = 'table-row'; }
+  else { tr.style.display = 'none'; c.innerHTML = ''; }
+  if (b) b.classList.toggle('ouvert', !!row._det);
+  checkConflicts();
+}
+function refreshDet(si, ri) {
+  const row = state[currentJour][si] && state[currentJour][si].rows[ri];
+  const c = document.getElementById(`detc-${si}-${ri}`);
+  if (row && c && row._det) c.innerHTML = detHtml(si, ri, row);
+  majBoutonDet(si, ri);
+}
+function detSaisieKm(si, ri, champ, val) {
+  const row = state[currentJour][si].rows[ri];
+  row[champ] = val; row._autoK = false;                 // valeur tapée : l'auto ne la touchera plus
+  majBoutonDet(si, ri);
+}
+function detSaisieCourse(si, ri, k, val) {
+  const row = state[currentJour][si].rows[ri];
+  if (!Array.isArray(row.courses)) row.courses = [];
+  while (row.courses.length < 4) row.courses.push('');
+  row.courses[k] = String(val || '').replace(/\s+/g, ' ').trim();
+  row.courses = row.courses.filter(Boolean);            // pas de trous : COURSE_1 d'abord
+  row._autoC = false;
+  refreshDet(si, ri);
+}
+function detReprendreAuto(si, ri) {
+  const row = state[currentJour][si].rows[ri];
+  if (!row.ps) { toast("Choisissez d'abord le PS", 'warn'); return; }
+  const trouve = coursesAuto(row.ps).length || kmAuto(row.ps);
+  if (!trouve) { toast('Ce PS n\'est pas dans REF_Courses / REF_KM : saisie au clavier', 'warn'); return; }
+  appliquerAuto(row, true);
+  refreshDet(si, ri);
+  toast('Valeurs automatiques reprises');
+}
+
+// ========================================================
+// ACTIONS
+// ========================================================
+function switchJour(jid) {
+  currentJour = jid;
+  renderAll();
+}
+
+function addSecteur() {
+  if (!SECTEURS.length) {
+    toast('Liste des secteurs non chargée depuis Sheets — utilisez « Réessayer »', 'err');
+    return;
+  }
+  const prises = new Set(state[currentJour].map(x => x.secteur));
+  const dispo  = SECTEURS.filter(n => n !== 'LA_GAILLARDE' && !prises.has(n) && (SECTEURS_TOUS || secteurActif(n, currentJour)));
+  if (!dispo.length) {
+    toast('Aucun secteur actif disponible — cochez « tous les secteurs » ou choisissez « PS sans secteur »', 'warn');
+    return;
+  }
+  state[currentJour].push({
+    secteur: dispo[0], referant: '', hmepSect: '6h00', collapsed: false,
+    commentaires: ['','',''],
+    rows: [emptyRow()]
+  });
+  renderAll();
+  // scroll to bottom
+  setTimeout(() => {
+    const last = document.getElementById(`sect-${state[currentJour].length - 1}`);
+    if (last) last.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function removeSecteur(si) {
+  if (state[currentJour].length <= 1) { toast('Au moins 1 secteur requis', 'warn'); return; }
+  if (confirm(`Supprimer le secteur ${state[currentJour][si].secteur} ?`)) {
+    state[currentJour].splice(si, 1);
+    renderAll();
+  }
+}
+
+function toggleCollapse(si, e) {
+  state[currentJour][si].collapsed = !state[currentJour][si].collapsed;
+  const bloc = document.getElementById(`sect-${si}`);
+  bloc.classList.toggle('collapsed');
+}
+
+function changeSecteur(si, val) {
+  const sec    = state[currentJour][si];
+  const autres = state[currentJour].filter((x, i) => i !== si).map(x => x.secteur);
+  if (val === '__SOLO__') {
+    const premier = (sec.rows || []).find(r => r.ps);
+    val = premier ? soloNom(premier.ps) : SOLO_VIDE;
+    if (autres.includes(val)) {
+      toast(val === SOLO_VIDE ? 'Un bloc « PS sans secteur » attend déjà son PS : choisissez-le d\'abord' : `${val} est déjà saisi dans un autre bloc ce jour`, 'warn');
+      rerenderSecteur(si); return;
+    }
+  } else if (autres.includes(val)) {
+    toast(`Le secteur ${val} est déjà ajouté ce jour`, 'warn');
+    rerenderSecteur(si); return;
+  }
+  sec.secteur = val;
+  rerenderSecteur(si);   // reconstruit le bloc : menus PS (liste du secteur + « Autres PS »), libellé des commentaires, mode « PS sans secteur »
+  checkConflicts();
+}
+
+function changeReferant(si, val) {
+  state[currentJour][si].referant = val;
+  const refObj = REFERANTS.find(r => r.nom === val);
+  document.getElementById(`tel-${si}`).textContent = refObj ? '📞 ' + refObj.tel : '';
+}
+
+function changeHmepSect(si, val) {
+  state[currentJour][si].hmepSect = val;
+}
+
+function addPS(si) {
+  if (estSolo(state[currentJour][si].secteur)) { toast('Un bloc « PS sans secteur » ne contient qu\'un PS — ajoutez un autre bloc', 'warn'); return; }
+  state[currentJour][si].rows.push(emptyRow());
+  const ri = state[currentJour][si].rows.length - 1;
+  const tbody = document.getElementById(`rows-${si}`);
+  tbody.insertAdjacentHTML('beforeend',
+    renderPSRow(si, ri, state[currentJour][si].rows[ri], state[currentJour][si].secteur)
+  );
+  updateStats();
+}
+
+function deleteRow(si, ri) {
+  const rows = state[currentJour][si].rows;
+  if (rows.length <= 1) { toast('Au moins 1 ligne par secteur', 'warn'); return; }
+  rows.splice(ri, 1);
+  // re-render rows for this secteur
+  const tbody = document.getElementById(`rows-${si}`);
+  tbody.innerHTML = rows.map((r, ri2) =>
+    renderPSRow(si, ri2, r, state[currentJour][si].secteur)
+  ).join('');
+  updateStats();
+  checkConflicts();
+}
+
+function updateRow(si, ri, field, val) {
+  state[currentJour][si].rows[ri][field] = val;
+  majBoutonDet(si, ri);
+  updateStats();
+  checkConflicts();
+}
+
+function updateCommentaire(si, ci, val) {
+  if (!state[currentJour][si].commentaires) state[currentJour][si].commentaires = ['','',''];
+  state[currentJour][si].commentaires[ci] = val;
+}
+
+function emptyRow() {
+  return { ps:'', hmep:'', vehA:'', vehB:'', b1:'', b2:'', b3:'', b4:'', b5:'',
+           com:0, crs:0, cmv:0, obs:'',
+           // volet « Détails »
+           kmRavit:'', kmAtelier:'', mepPar:'', mepLieu:'', hmepRdv:'', courses:[], premierPart:'', commA:'', commB:'' };
+}
+
+// ========================================================
+// STATS
+// ========================================================
+function updateStats() {
+  const sects = state[currentJour] || [];
+  const psSet = new Set(); let benv = 0, veh = new Set();
+  sects.forEach(s => {
+    s.rows.forEach(r => {
+      if (r.ps) psSet.add(r.ps);
+      ['b1','b2','b3','b4','b5'].forEach(k => { if (r[k]) benv++; });
+      if (r.vehA) veh.add(r.vehA);
+      if (r.vehB) veh.add(r.vehB);
+    });
+  });
+  document.getElementById('statPS').textContent = psSet.size;
+  document.getElementById('statBenv').textContent = benv;
+  document.getElementById('statVeh').textContent = veh.size;
+}
+
+// ========================================================
+// CONFLICT CHECK — bénévoles doublons + radios max + véhicules doublons
+// ========================================================
+const RADIO_MAX = { com: 20, crs: 15, cmv: 10 };
+
+function checkConflicts() {
+  const sects = state[currentJour] || [];
+  const benvCount = {}, vehCount = {};
+  let totalCOM = 0, totalCRS = 0, totalCMV = 0;
+
+  sects.forEach(s => {
+    s.rows.forEach(r => {
+      ['b1','b2','b3','b4','b5'].forEach(k => {
+        if (r[k]) benvCount[r[k]] = (benvCount[r[k]] || 0) + 1;
+      });
+      if (r.vehA) vehCount[r.vehA] = (vehCount[r.vehA] || 0) + 1;
+      if (r.vehB) vehCount[r.vehB] = (vehCount[r.vehB] || 0) + 1;
+      totalCOM += (r.com || 0);
+      totalCRS += (r.crs || 0);
+      totalCMV += (r.cmv || 0);
+    });
+  });
+
+  // --- Bénévoles doublons (highlight cellule) ---
+  let hasBenvConflict = false;
+  document.querySelectorAll('.conflict-cell').forEach(el => el.classList.remove('conflict-cell'));
+  document.querySelectorAll('.btn-det.conflit').forEach(el => el.classList.remove('conflit'));
+  sects.forEach((s, si) => {
+    s.rows.forEach((r, ri) => {
+      ['b1','b2','b3','b4','b5'].forEach((k, ki) => {
+        if (r[k] && benvCount[r[k]] > 1) {
+          const td = document.querySelector(`#benv-${si}-${ri}-${ki+1}`);
+          if (td) { td.classList.add('conflict-cell'); hasBenvConflict = true; }
+          if (ki >= 3) {                                   // personne 4 ou 5 : le volet est peut-être fermé → on signale sur le bouton
+            hasBenvConflict = true;
+            const bt = document.getElementById(`det-btn-${si}-${ri}`); if (bt) bt.classList.add('conflit');
+          }
+        }
+      });
+    });
+  });
+  const badge = document.getElementById('badgeConflicts');
+  if (hasBenvConflict) {
+    const dups = Object.entries(benvCount).filter(([,v]) => v > 1).map(([k]) => k);
+    badge.style.display = 'inline';
+    badge.textContent = `⚠ ${dups.length} conflit(s) bénévoles`;
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // --- A5 : Radio totaux + pills ---
+  const totals = { com: totalCOM, crs: totalCRS, cmv: totalCMV };
+  const labels = { com: 'COM', crs: 'CRS', cmv: 'CMV' };
+  const maxes  = { com: RADIO_MAX.com, crs: RADIO_MAX.crs, cmv: RADIO_MAX.cmv };
+  ['com','crs','cmv'].forEach(t => {
+    const el = document.getElementById(`stat${t.toUpperCase()}`);
+    if (!el) return;
+    el.textContent = `${labels[t]} ${totals[t]}/${maxes[t]}`;
+    el.classList.toggle('over', totals[t] > maxes[t]);
+  });
+
+  // --- A6 : Véhicules doublons (highlight) ---
+  document.querySelectorAll('.conflict-veh').forEach(el => el.classList.remove('conflict-veh'));
+  sects.forEach((s, si) => {
+    s.rows.forEach((r, ri) => {
+      if (r.vehA && vehCount[r.vehA] > 1) {
+        const row = document.getElementById(`row-${si}-${ri}`);
+        if (row) { const cells = row.querySelectorAll('td'); if(cells[3]) cells[3].classList.add('conflict-veh'); }
+      }
+      if (r.vehB && vehCount[r.vehB] > 1) {
+        const row = document.getElementById(`row-${si}-${ri}`);
+        if (row) { const cells = row.querySelectorAll('td'); if(cells[4]) cells[4].classList.add('conflict-veh'); }
+      }
+    });
+  });
+
+  // --- PS saisi plusieurs fois le même jour (même libellé, ou numéro commun : « 118 119 120 & 121 » + « 120 ») ---
+  document.querySelectorAll('.conflict-ps').forEach(el => el.classList.remove('conflict-ps'));
+  const psItems = [];
+  sects.forEach((sec, si) => sec.rows.forEach((r, ri) => {
+    if (r.ps) psItems.push({ si, ri, label: r.ps, cles: clesPS(r.ps), secteur: sec.secteur });
+  }));
+  const psMsgs = [], psFlag = new Set();
+  const parLabel = {};
+  psItems.forEach(it => { (parLabel[it.label] = parLabel[it.label] || []).push(it); });
+  Object.entries(parLabel).forEach(([lab, arr]) => {
+    if (arr.length > 1) {
+      arr.forEach(it => psFlag.add(it.si + '-' + it.ri));
+      psMsgs.push(`PS <strong>${lab}</strong> saisi <strong>${arr.length}×</strong> (${arr.map(a => a.secteur).join(' / ')})`);
+    }
+  });
+  for (let a = 0; a < psItems.length; a++) {
+    for (let b = a + 1; b < psItems.length; b++) {
+      const A = psItems[a], B = psItems[b];
+      if (A.label === B.label) continue;
+      const commun = A.cles.filter(k => B.cles.includes(k));
+      if (commun.length) {
+        psFlag.add(A.si + '-' + A.ri); psFlag.add(B.si + '-' + B.ri);
+        psMsgs.push(`N° <strong>${commun.join(', ').replace(/BIS/g, ' BIS')}</strong> présent dans 2 lignes : « ${A.label} » (${A.secteur}) et « ${B.label} » (${B.secteur})`);
+      }
+    }
+  }
+  psFlag.forEach(k => { const td = document.querySelector(`#row-${k} td.col-ps`); if (td) td.classList.add('conflict-ps'); });
+
+  // --- Build alerts bar ---
+  const alerts = [];
+
+  // PS en double (limité à 6 messages)
+  psMsgs.slice(0, 6).forEach(m => {
+    alerts.push(`<div class="alert-item veh-double">
+        <span class="alert-icon">📍</span>
+        <span class="alert-text">${m} — vérifier l'affectation</span>
+      </div>`);
+  });
+  if (psMsgs.length > 6) alerts.push(`<div class="alert-item veh-double"><span class="alert-icon">📍</span><span class="alert-text">… et ${psMsgs.length - 6} autre(s) PS en double</span></div>`);
+
+  // A5-2 : radio over-limit
+  ['com','crs','cmv'].forEach(t => {
+    if (totals[t] > maxes[t]) {
+      alerts.push(`<div class="alert-item radio-over">
+        <span class="alert-icon">📻</span>
+        <span class="alert-text">Radios <strong>${labels[t]}</strong> : <strong>${totals[t]}</strong> attribuées — max autorisé : <strong>${maxes[t]}</strong> (dépassement de ${totals[t]-maxes[t]})</span>
+      </div>`);
+    }
+  });
+
+  // A6 : véhicules utilisés plus d'une fois
+  Object.entries(vehCount).forEach(([veh, cnt]) => {
+    if (cnt > 1) {
+      alerts.push(`<div class="alert-item veh-double">
+        <span class="alert-icon">🚗</span>
+        <span class="alert-text">Véhicule <strong>${veh}</strong> utilisé <strong>${cnt}×</strong> sur ${JOURS.find(j=>j.id===currentJour)?.label} — vérifier l'affectation</span>
+      </div>`);
+    }
+  });
+
+  document.getElementById('alertsBar').innerHTML = alerts.join('');
+
+  // Ad : BIP sonore si nouvelles alertes
+  if (alerts.length > 0) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const bip = (freq, start, dur) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = freq;
+        o.type = 'sine';
+        g.gain.setValueAtTime(0.3, ctx.currentTime + start);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+        o.start(ctx.currentTime + start);
+        o.stop(ctx.currentTime + start + dur);
+      };
+      // Double bip court et aigu pour attirer l'attention
+      bip(880, 0,    0.12);
+      bip(880, 0.16, 0.12);
+    } catch(e) {} // silencieux si AudioContext non supporté
+  }
+}
+
+// ========================================================
+// REPORT
+// ========================================================
+function openReport() {
+  const jourId   = currentJour;
+  const dateInfo = JOURS.find(j => j.id === jourId);
+  document.getElementById('reportTitle').textContent =
+    `${titreEvt()} — ${dateInfo.date}`;
+
+  const body  = document.getElementById('reportBody');
+  body.innerHTML = '';
+  const sects = state[jourId] || [];
+
+  // Totaux globaux Jx (récapitulatif de la journée : contenu inchangé)
+  let gtBenv=0, gtCOM=0, gtCRS=0, gtCMV=0;
+  const gtVehs = new Set(), gtPSSet = new Set();
+  sects.forEach(s => s.rows.forEach(r => {
+    if (!r.ps) return; gtPSSet.add(r.ps);
+    [r.b1,r.b2,r.b3,r.b4,r.b5].forEach(b => { if(b) gtBenv++; });
+    if(r.vehA) gtVehs.add(r.vehA); if(r.vehB) gtVehs.add(r.vehB);
+    gtCOM += (r.com||0); gtCRS += (r.crs||0); gtCMV += (r.cmv||0);
+  }));
+
+  const gtPS = gtPSSet.size;
+
+  // Contrôle (non imprimé) : secteurs activés ce jour dans REF_Secteurs mais sans aucun PS saisi
+  let avertSect = '';
+  if (SECTEURS.some(n => SECTEURS_JOURS[n])) {
+    const saisis = new Set(sects.filter(x => x.rows.some(r => r.ps)).map(x => x.secteur));
+    const manquants = SECTEURS.filter(n => n !== 'LA_GAILLARDE' && secteurActif(n, jourId) && !saisis.has(n));
+    if (manquants.length) {
+      avertSect = `<div class="no-print-report" style="background:rgba(230,126,34,.15);border:1px solid #E67E22;color:#E67E22;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px">
+        ⚠ Secteurs actifs ce jour <strong>sans aucun PS saisi</strong> : ${manquants.join(', ')} <span style="opacity:.7">(ce message n'est pas imprimé)</span></div>`;
+    }
+  }
+
+  const radiosTxt = (com, crs, cmv) => [com ? com + ' COM' : '', crs ? crs + ' CRS' : '', cmv ? cmv + ' CMV' : ''].filter(Boolean).join(' · ');
+
+  // Tableau unique, mêmes colonnes que le Report Jx LA_GAILLARDE : une ligne par PS.
+  // Un secteur = une bande (nom, H MeP secteur, totaux) puis ses PS ; référent et téléphone du référent du secteur rappelés sur chaque ligne.
+  let lignes = '';
+  sects.forEach(s => {
+    const rows  = s.rows.filter(r => r.ps);
+    const tel   = s.telReferant || (REFERANTS.find(r => r.nom === s.referant)||{}).tel || '';
+    const refAff = s.referant ? nomAff(s.referant, s.secteur) : '';
+    const solo  = estSolo(s.secteur);
+    let sBenv=0;
+    rows.forEach(r => { [r.b1,r.b2,r.b3,r.b4,r.b5].forEach(b => { if(b) sBenv++; }); });
+    lignes += `<tr class="rpt-band"><td colspan="8"><strong>▸ ${solo ? 'PS sans secteur' : s.secteur}</strong>` +
+      `<span>MeP secteur : <b>${s.hmepSect || '—'}</b></span><span>${rows.length} PS · ${sBenv} bénév.</span></td></tr>`;
+    if (!rows.length) {
+      lignes += `<tr><td colspan="8" class="rpt-vide">Aucun PS saisi</td></tr>`;
+      return;
+    }
+    rows.forEach(r => {
+      const benvs = [r.b1,r.b2,r.b3,r.b4,r.b5].filter(Boolean).map(b => nomAff(b, s.secteur)).join(', ');
+      const vehs  = [r.vehA, r.vehB].filter(Boolean).join(' + ');
+      lignes += `<tr>
+        <td><strong>${r.ps}</strong></td>
+        <td>${refAff || '—'}</td>
+        <td class="rpt-tel">${tel}</td>
+        <td class="rpt-benv">${benvs || '—'}</td>
+        <td>${vehs || '—'}</td>
+        <td class="rpt-mep">${r.hmep || '—'}</td>
+        <td class="rpt-rad">${radiosTxt(r.com, r.crs, r.cmv) || '—'}</td>
+        <td class="rpt-obs">${r.obs || ''}</td>
+      </tr>`;
+    });
+  });
+
+  body.insertAdjacentHTML('beforeend', avertSect + `
+    <div class="rpt-page">
+      <div class="rpt-titre">${titreEvt()} — REPORT ${jourId} · TOUS SECTEURS · ${dateInfo.date}</div>
+      <div class="rpt-recap">
+        <span class="rpt-recap-t">📊 Totaux journée</span>
+        <span class="rpt-box"><em>PS actifs</em><b style="color:#C0392B">${gtPS}</b></span>
+        <span class="rpt-box"><em>Bénévoles</em><b style="color:#1E8449">${gtBenv}</b></span>
+        <span class="rpt-box"><em>Véhicules</em><b style="color:#1A5276">${gtVehs.size}</b></span>
+        <span class="rpt-box"><em>Radios</em><b class="rpt-radios">
+          ${gtCOM ? `<span style="color:#1A5276">${gtCOM} COM</span> ` : ''}${gtCRS ? `<span style="color:#922B21">${gtCRS} CRS</span> ` : ''}${gtCMV ? `<span style="color:#1E8449">${gtCMV} CMV</span>` : ''}${(gtCOM||gtCRS||gtCMV) ? '' : '—'}
+        </b></span>
+        <span class="rpt-box"><em>Secteurs</em><b>${sects.length}</b></span>
+      </div>
+      <table class="rpt-table">
+        <thead><tr>
+          <th>N° PS &amp; Lieu-dit</th><th>Signaleur Référent</th><th>Téléphone</th>
+          <th>Signaleurs accompagnants</th><th>Véhicule(s)</th><th>H MeP</th><th>Radios</th><th>Observations</th>
+        </tr></thead>
+        <tbody>${lignes || '<tr><td colspan="8" class="rpt-vide">Aucune saisie pour ' + jourId + '</td></tr>'}</tbody>
+      </table>
+    </div>
+    <button class="btn-fiche-print btn-print-report" onclick="imprimerReport()">🖨 Imprimer ce report</button>`);
+
+  document.getElementById('reportOverlay').classList.add('active');
+}
+
+// ========================================================
+// LA_GAILLARDE — Saisie individuelle par PS
+// ========================================================
+let glrdState = {}; // { J1: [{NUM_PS, LIEU_DIT, REFERENT, ACC_1...}], J2: ... }
+let glrdJour  = 'J1';
+
+// ── Bénévoles disponibles PAR JOUR pour le module LA_GAILLARDE ──────────────
+// BENEVOLES / BENEVOLES_LABEL / BENEVOLES_DATA reflètent le jour de la saisie Tous Secteurs (currentJour).
+// Le module LG a son propre sélecteur de jour : ses listes déroulantes doivent suivre glrdJour.
+// glrdBenevCache[jour] = { noms:[NOM ou "NOM Prénom"], label:{nom→libellé}, data:[{nom,label,tel}] }
+const glrdBenevCache = {};
+let refJourCharge = null; // jour auquel correspondent actuellement BENEVOLES / BENEVOLES_DATA
+
+function glrdBenev() {
+  return glrdBenevCache[glrdJour] || { noms: BENEVOLES, label: BENEVOLES_LABEL, data: BENEVOLES_DATA };
+}
+
+// Nom à AFFICHER pour une valeur stockée (NOM ou "NOM Prénom") : libellé complet NOM Prénom.
+// Cherche d'abord la liste du jour LG, puis les autres jours déjà chargés, puis la liste TS courante.
+function glrdNomAff(nom) {
+  if (!nom) return '';
+  const l = glrdBenev().label[nom];
+  if (l) return l;
+  for (const j in glrdBenevCache) { if (glrdBenevCache[j].label[nom]) return glrdBenevCache[j].label[nom]; }
+  return BENEVOLES_LABEL[nom] || nom;
+}
+
+// Recherche d'un bénévole (téléphone…) : liste du jour LG d'abord, puis liste TS courante
+function glrdFindBenev(nom) {
+  if (!nom) return null;
+  return glrdBenev().data.find(b => b.nom === nom) || BENEVOLES_DATA.find(b => b.nom === nom) || null;
+}
+
+async function glrdChargerBenevoles(jour) {
+  if (glrdBenevCache[jour]) return true;
+  // Même jour que celui déjà chargé pour Tous Secteurs : on réutilise (copie, car les tableaux sont réécrits au rechargement)
+  if (jour === refJourCharge && BENEVOLES_DATA.length) {
+    glrdBenevCache[jour] = {
+      noms: BENEVOLES.slice(), label: Object.assign({}, BENEVOLES_LABEL),
+      data: BENEVOLES_DATA.map(b => Object.assign({}, b))
+    };
+    return true;
+  }
+  try {
+    const json = await callASRetry({ action: 'getReferentiels', jour });
+    if (!json.ok) throw new Error(json.error);
+    const noms = [], label = {}, data = [];
+    (json.data.benevoles || []).forEach(b => {
+      const nomSeul = b.nomSeul || b.nom.split(' ')[0];
+      noms.push(nomSeul); label[nomSeul] = b.nom;
+      data.push({ nom: nomSeul, label: b.nom, tel: b.tel || '' });
+    });
+    glrdBenevCache[jour] = { noms, label, data };
+    return true;
+  } catch(e) {
+    console.warn('glrd bénévoles ' + jour, e);
+    return false;
+  }
+}
+
+function openGaillarde() {
+  // Peupler sélecteur de jours
+  const sel = document.getElementById('glrdJourSelect');
+  sel.innerHTML = JOURS.map(j =>
+    `<option value="${j.id}">${j.label} — ${j.date}</option>`
+  ).join('');
+  // Forcer la valeur APRÈS innerHTML (évite que l'ancienne valeur du select
+  // soit relue par glrdChargerJour si le DOM n'a pas encore pris en compte
+  // l'attribut selected de la reconstruction innerHTML)
+  sel.value = currentJour;
+  glrdJour  = currentJour;
+  // Forcer le rechargement Sheets du jour courant à chaque ouverture
+  // (évite d'afficher un cache périmé si des données ont été sauvegardées
+  // depuis une autre session ou entre deux ouvertures du panneau)
+  delete glrdState[glrdJour];
+  delete glrdBenevCache[glrdJour]; // relire les disponibilités du Sheet
+  document.getElementById('glrdOverlay').classList.add('active');
+  glrdChargerJour();
+}
+
+function glrdToast(msg, type='ok') {
+  // Toast affiché dans l'overlay Gaillarde
+  let el = document.getElementById('glrdToastEl');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'glrdToastEl';
+    el.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:500;
+      padding:10px 18px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;
+      font-size:15px;font-weight:700;letter-spacing:0.5px;
+      box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:opacity 0.3s;`;
+    document.body.appendChild(el);
+  }
+  const colors = { ok:'#27AE60', err:'#C0392B', warn:'#E67E22' };
+  el.style.background = colors[type] || colors.ok;
+  el.style.color = '#fff';
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 3500);
+}
+
+function closeGaillarde() {
+  document.getElementById('glrdOverlay').classList.remove('active');
+}
+
+function glrdTab(name, btn) {
+  document.querySelectorAll('.glrd-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.glrd-tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`glrdTab${name.charAt(0).toUpperCase()+name.slice(1)}`).classList.add('active');
+  if (name === 'fiches') glrdRenderFiches();
+  if (name === 'report') glrdRenderReport();
+}
+
+async function glrdChargerJour() {
+  // Lire le jour depuis le select ; si vide (premier rendu), garder glrdJour déjà fixé
+  const selVal = document.getElementById('glrdJourSelect').value;
+  if (selVal) glrdJour = selVal;
+  const jourDemande = glrdJour;
+  // Bénévoles disponibles CE jour-là (sinon les listes restent celles du jour Tous Secteurs)
+  const benevOk = await glrdChargerBenevoles(jourDemande);
+  if (jourDemande !== glrdJour) return; // l'utilisateur a changé de jour entre-temps
+  if (!benevOk) glrdToast('⚠ Liste des bénévoles de ' + jourDemande + ' non chargée — vérifiez avant de sélectionner', 'warn');
+  if (!glrdState[glrdJour]) {
+    // Charger depuis Sheets
+    try {
+      const json = await callASRetry({ action: 'getSaisieGaillarde', jour: glrdJour });
+      if (json.ok && json.data.length) {
+        // Helper : retrouver le libellé complet "33 - Impasse des Celtes"
+        // depuis le numéro seul "33" stocké dans Sheets (après correction saveSaisieGaillarde)
+        // Le select PS utilise le libellé complet comme value → nécessaire pour la sélection
+        const psList = PS_SECTEUR['LA_GAILLARDE'] || [];
+        function numPsToLibelle(numStr, lieuDit) {
+          if (!numStr) return '';
+          let num = String(numStr).trim();
+          // « 30 BIS » éventuellement présent dans NUM_PS, ou BIS resté en tête du lieu-dit (« BIS - Dessus Banc »)
+          // à cause de l'ancien découpage « 30 BIS - … » → NUM_PS « 30 » + LIEU_DIT « BIS - … »
+          let isBis = /^BIS\b/i.test(String(lieuDit || '').trim());
+          const mBis = num.match(/^(\d+)\s*BIS$/i);
+          if (mBis) { num = mBis[1]; isBis = true; }
+          if (/^\d+$/.test(num)) {
+            if (isBis) {
+              const fb = psList.find(p => new RegExp('^' + num + '\\s*BIS(?![A-Za-z0-9])', 'i').test(p));
+              if (fb) return fb;
+            }
+            // numéro exact, hors « BIS » (« 30 - … » ou « 30 »)
+            const fe = psList.find(p => new RegExp('^' + num + '(?!\\d)\\s*(-|$)').test(p));
+            if (fe) return fe;
+          }
+          const found = psList.find(p => p.startsWith(num + ' ') || p.startsWith(num + '-') || p === num);
+          return found || num; // fallback : numéro seul si non trouvé dans PS_SECTEUR
+        }
+
+        glrdState[glrdJour] = json.data.map(r => ({
+          NUM_PS: numPsToLibelle(r.NUM_PS, r.LIEU_DIT), // "33" → "33 - Impasse des Celtes" ; « 30 » + « BIS - … » → « 30 BIS - … »
+          LIEU_DIT: r.LIEU_DIT||'',
+          REFERENT: r.REFERENT||'', ACC_1: r.ACC_1||'', ACC_2: r.ACC_2||'', ACC_3: r.ACC_3||'', ACC_4: r.ACC_4||'',
+          VEH_A: r.VEH_A||'', VEH_B: r.VEH_B||'',
+          NB_COM: r.NB_COM||0, NB_CRS: r.NB_CRS||0, NB_CMV: r.NB_CMV||0,
+          MEP_PAR: r.MEP_PAR||'', MEP_LIEU: r.MEP_LIEU||'', HMEP: r.HMEP||'', HMEP_RDV: r.HMEP_RDV||'',
+          KM_RAVIT: r.KM_RAVIT||'', KM_ATELIER: r.KM_ATELIER||'',
+          COURSE_1: r.COURSE_1||'', COURSE_2: r.COURSE_2||'',
+          COURSE_3: r.COURSE_3||'', COURSE_4: r.COURSE_4||'',
+          PREMIER_PART: r.PREMIER_PART||'',
+          COMM_A: r.COMM_A||'', COMM_B: r.COMM_B||'', COMM_C: r.COMM_C||'',
+        }));
+      } else {
+        glrdState[glrdJour] = [];
+      }
+    } catch(e) {
+      glrdState[glrdJour] = [];
+    }
+    if (jourDemande !== glrdJour) return;
+  }
+  glrdRenderSaisie();
+}
+
+function glrdEmptyPS() {
+  return {
+    NUM_PS:'', LIEU_DIT:'', REFERENT:'', ACC_1:'', ACC_2:'', ACC_3:'', ACC_4:'',
+    VEH_A:'', VEH_B:'', NB_COM:0, NB_CRS:0, NB_CMV:0,
+    MEP_PAR:'', MEP_LIEU:'', HMEP:'', HMEP_RDV:'', KM_RAVIT:'', KM_ATELIER:'',
+    COURSE_1:'', COURSE_2:'', COURSE_3:'', COURSE_4:'',
+    PREMIER_PART:'', COMM_A:'', COMM_B:'', COMM_C:'',
+  };
+}
+
+function glrdAddPS() {
+  if (!glrdState[glrdJour]) glrdState[glrdJour] = [];
+  glrdState[glrdJour].push(glrdEmptyPS());
+  glrdRenderSaisie();
+  // Scroller vers le bas
+  const list = document.getElementById('glrdPSList');
+  setTimeout(() => list.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+function glrdDelPS(idx) {
+  if (confirm('Supprimer ce PS ?')) {
+    glrdState[glrdJour].splice(idx, 1);
+    glrdRenderSaisie();
+  }
+}
+
+function glrdUpdate(idx, field, val) {
+  if (!glrdState[glrdJour]?.[idx]) return;
+  glrdState[glrdJour][idx][field] = val;
+  glrdUpdateStats();
+}
+
+// PS filtrés secteur LA_GAILLARDE
+function glrdPSOpts(selected) {
+  const psList = PS_SECTEUR['LA_GAILLARDE'] || [];
+  return '<option value="">— PS —</option>' +
+    psList.map(p => `<option value="${p}" ${p===selected?'selected':''}>${p}</option>`).join('');
+}
+
+function glrdBenvOpts(selected='') {
+  const B = glrdBenev();
+  let orphan = '';
+  // Valeur déjà enregistrée mais non disponible ce jour-là : on la garde visible (sinon elle serait effacée à la sauvegarde)
+  if (selected && !B.noms.includes(selected)) {
+    const lab = BENEVOLES_LABEL[selected] || selected;
+    orphan = `<option value="${selected}" selected>${lab} ⚠ non dispo ce jour</option>`;
+  }
+  return '<option value="">—</option>' +
+    B.noms.map(b => {
+      const label = B.label[b] || b;
+      return `<option value="${b}" ${b===selected?'selected':''}>${label}</option>`;
+    }).join('') + orphan;
+}
+
+function glrdVehOpts(selected='') {
+  return '<option value="">—</option>' +
+    VEHICULES.map(v => `<option value="${v}" ${v===selected?'selected':''}>${v}</option>`).join('') +
+    orphanOpt(VEHICULES, selected);
+}
+
+function glrdHeurOpts(selected='') {
+  return '<option value="">—</option>' +
+    HEURES_MEP.map(h => `<option value="${h}" ${h===selected?'selected':''}>${h}</option>`).join('');
+}
+
+function glrdRefOpts(selected='') {
+  // REFERANTS contient {nom, tel} où nom = NOM+PRENOM (référants issus de Sheets)
+  // On cherche aussi dans BENEVOLES_LABEL pour l'affichage enrichi
+  return '<option value="">—</option>' +
+    REFERANTS.map(r => {
+      const label = glrdBenev().label[r.nom] || BENEVOLES_LABEL[r.nom] || r.nom;
+      return `<option value="${r.nom}" ${r.nom===selected?'selected':''}>${label}</option>`;
+    }).join('');
+}
+
+function glrdRenderSaisie() {
+  const rows = glrdState[glrdJour] || [];
+  const list = document.getElementById('glrdPSList');
+
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-style:italic">Aucun PS saisi pour ' + glrdJour + ' — cliquer &quot;+ Ajouter un PS&quot;</div>';
+    return;
+  }
+
+  // Générer le HTML sans le select PS (les backticks imbriqués causaient un bug)
+  let html = '';
+  rows.forEach((r, idx) => {
+    html += '<div class="glrd-ps-card">';
+
+    // En-tête avec select PS vide (peuplé après)
+    html += '<div class="glrd-ps-header">';
+    html += '<span>PS ' + (idx+1) + '</span>';
+    html += '<select id="glrd-ps-select-' + idx + '" onchange="glrdUpdate(' + idx + ',\'NUM_PS\',this.value)" ';
+    html += 'style="background:#0F2744;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 8px;font-weight:700;font-size:13px;flex:1;max-width:400px">';
+    html += '</select>';
+    html += '<label style="color:rgba(255,255,255,0.8);font-size:11px;font-weight:700;letter-spacing:1px;white-space:nowrap;margin-left:12px">H MeP</label>';
+    html += '<select id="glrd-hmep-select-' + idx + '" onchange="glrdUpdate(' + idx + ',\'HMEP\',this.value)" ';
+    html += 'style="background:#0F2744;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 8px;font-weight:700;font-size:13px;min-width:90px">';
+    html += '</select>';
+    html += '<button class="glrd-btn-del" onclick="glrdDelPS(' + idx + ')">✕ Supprimer</button>';
+    html += '</div>';
+
+    // Signaleurs
+    html += '<div class="glrd-section-label">👤 Signaleurs</div>';
+    html += '<div class="glrd-grid glrd-grid-5" style="padding:10px 14px">';
+    html += glrdFieldSelect('Signaleur Référent', idx, 'REFERENT', r.REFERENT, glrdRefOpts(r.REFERENT));
+    html += glrdFieldSelect('Accompagnant 1', idx, 'ACC_1', r.ACC_1, glrdBenvOpts(r.ACC_1));
+    html += glrdFieldSelect('Accompagnant 2', idx, 'ACC_2', r.ACC_2, glrdBenvOpts(r.ACC_2));
+    html += glrdFieldSelect('Accompagnant 3', idx, 'ACC_3', r.ACC_3, glrdBenvOpts(r.ACC_3));
+    html += glrdFieldSelect('Accompagnant 4', idx, 'ACC_4', r.ACC_4, glrdBenvOpts(r.ACC_4));
+    html += '</div>';
+
+    // Véhicules & Radios
+    html += '<div class="glrd-section-label">🚗 Véhicules & Radios</div>';
+    html += '<div class="glrd-grid glrd-grid-3" style="padding:10px 14px">';
+    html += glrdFieldSelect('Véhicule A', idx, 'VEH_A', r.VEH_A, glrdVehOpts(r.VEH_A));
+    html += glrdFieldSelect('Véhicule B', idx, 'VEH_B', r.VEH_B, glrdVehOpts(r.VEH_B));
+    html += '<div class="glrd-field"><label>Radios</label><div class="glrd-radio-row">';
+    html += '<span style="font-size:10px;color:#1A5276;font-weight:700">COM</span>';
+    html += '<input type="number" min="0" max="9" placeholder="0" value="' + (r.NB_COM||'') + '" onchange="glrdUpdate(' + idx + ',\'NB_COM\',+this.value)" style="width:50px;text-align:center;font-weight:700;font-size:14px;color:#1A5276;border:1px solid rgba(41,128,185,0.4);border-radius:4px;padding:4px;background:#f9f9f9" oninput="this.style.background=this.value>0?\'#EBF5FB\':\'#f9f9f9\'">';
+    html += '<span style="font-size:10px;color:#006064;font-weight:700">CRS</span>';
+    html += '<input type="number" min="0" max="9" placeholder="0" value="' + (r.NB_CRS||'') + '" onchange="glrdUpdate(' + idx + ',\'NB_CRS\',+this.value)" style="width:50px;text-align:center;font-weight:700;font-size:14px;color:#006064;border:1px solid rgba(0,188,212,0.4);border-radius:4px;padding:4px;background:#f9f9f9" oninput="this.style.background=this.value>0?\'#E0F7FA\':\'#f9f9f9\'">';
+    html += '<span style="font-size:10px;color:#1E8449;font-weight:700">CMV</span>';
+    html += '<input type="number" min="0" max="9" placeholder="0" value="' + (r.NB_CMV||'') + '" onchange="glrdUpdate(' + idx + ',\'NB_CMV\',+this.value)" style="width:50px;text-align:center;font-weight:700;font-size:14px;color:#1E8449;border:1px solid rgba(39,174,96,0.4);border-radius:4px;padding:4px;background:#f9f9f9" oninput="this.style.background=this.value>0?\'#EAFAF1\':\'#f9f9f9\'">';
+    html += '</div></div></div>';
+
+    // Mise en place
+    html += '<div class="glrd-section-label">🚩 Mise en place</div>';
+    html += '<div class="glrd-grid glrd-grid-3" style="padding:10px 14px">';
+    html += glrdFieldSelect('Mise en place par', idx, 'MEP_PAR', r.MEP_PAR, glrdRefOpts(r.MEP_PAR));
+    html += '<div class="glrd-field"><label>Lieu MeP (saisie)</label>';
+    html += '<input type="text" value="' + (r.MEP_LIEU||'').replace(/"/g,'&quot;') + '" placeholder="ex: Parking Fournel" oninput="glrdUpdate(' + idx + ',\'MEP_LIEU\',this.value)"></div>';
+    html += glrdFieldSelect('Heure RDV MeP', idx, 'HMEP_RDV', r.HMEP_RDV||'', glrdHeurOpts(r.HMEP_RDV||''));
+    html += '</div>'; // Heure RDV MeP = pour Fiche de Poste
+
+    // Distances
+    html += '<div class="glrd-section-label">📍 Distances</div>';
+    html += '<div class="glrd-grid" style="padding:10px 14px">';
+    html += '<div class="glrd-field"><label>Ravitaillement (Kms)</label>';
+    html += '<input type="text" value="' + (r.KM_RAVIT||'') + '" placeholder="ex: 3.5" oninput="glrdUpdate(' + idx + ',\'KM_RAVIT\',this.value)"></div>';
+    html += '<div class="glrd-field"><label>Assistance / Atelier (Kms)</label>';
+    html += '<input type="text" value="' + (r.KM_ATELIER||'') + '" placeholder="ex: 7.2" oninput="glrdUpdate(' + idx + ',\'KM_ATELIER\',this.value)"></div>';
+    html += '</div>';
+
+    // Courses + 1er Participant
+    html += '<div class="glrd-section-label">🏁 Courses du jour & 1er Participant</div>';
+    html += '<div class="glrd-grid glrd-grid-4" style="padding:10px 14px">';
+    [1,2,3].forEach(n => {
+      html += '<div class="glrd-field"><label>Course ' + n + '</label>';
+      html += '<input type="text" value="' + (r['COURSE_'+n]||'').replace(/"/g,'&quot;') + '" placeholder="Nom course ' + n + '…" oninput="glrdUpdate(' + idx + ',\'COURSE_' + n + '\',this.value)"></div>';
+    });
+    html += glrdFieldSelect('1er Participant vers', idx, 'PREMIER_PART', r.PREMIER_PART, glrdHeurOpts(r.PREMIER_PART));
+    html += '</div>';
+
+    // Commentaires
+    html += '<div class="glrd-section-label">📝 Commentaires</div>';
+    html += '<div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px">';
+    ['A','B','C'].forEach(l => {
+      const placeholder = l === 'C' ? 'Observation Orga Roc…' : 'Commentaire ' + l + '…';
+      const labelStyle  = l === 'C' ? 'min-width:20px;margin:0;color:#E67E22;font-weight:700' : 'min-width:20px;margin:0';
+      const labelTitle  = l === 'C' ? ' title="→ Report Jx uniquement"' : '';
+      html += '<div class="glrd-field" style="display:flex;align-items:center;gap:8px">';
+      html += '<label style="' + labelStyle + '"' + labelTitle + '>' + l + '</label>';
+      html += '<input type="text" value="' + (r['COMM_'+l]||'').replace(/"/g,'&quot;') + '" placeholder="' + placeholder + '" oninput="glrdUpdate(' + idx + ',\'COMM_' + l + '\',this.value)" style="flex:1"></div>';
+    });
+    html += '</div>';
+
+    html += '</div>'; // glrd-ps-card
+  });
+
+  list.innerHTML = html;
+
+  // Peupler les selects PS APRÈS le rendu DOM
+  rows.forEach((r, idx) => {
+    const selPS = document.getElementById('glrd-ps-select-' + idx);
+    if (selPS) {
+      const psList = PS_SECTEUR['LA_GAILLARDE'] || [];
+      selPS.innerHTML = '<option value="">— PS —</option>' +
+        psList.map(p => '<option value="' + p + '"' + (p === r.NUM_PS ? ' selected' : '') + '>' + p + '</option>').join('');
+    }
+    const selHmep = document.getElementById('glrd-hmep-select-' + idx);
+    if (selHmep) {
+      selHmep.innerHTML = '<option value="">—</option>' +
+        HEURES_MEP.map(h => '<option value="' + h + '"' + (h === r.HMEP ? ' selected' : '') + '>' + h + '</option>').join('');
+    }
+  });
+
+  glrdUpdateStats();
+}
+
+// Helper champ select
+function glrdFieldSelect(label, idx, field, value, opts) {
+  return '<div class="glrd-field"><label>' + label + '</label>' +
+    '<select onchange="glrdUpdate(' + idx + ',\'' + field + '\',this.value)">' + opts + '</select></div>';
+}
+
+
+async function glrdSauvegarder() {
+  const btn = document.getElementById('glrdBtnSave');
+  if (btn) { btn.textContent = '⏳ Envoi…'; btn.disabled = true; }
+  const rows = glrdState[glrdJour] || [];
+  try {
+    const result = await callASRetry({
+      action: 'saveSaisieGaillarde',
+      jour: glrdJour,
+      data: JSON.stringify(rows),
+    });
+    if (result && result.ok) {
+      glrdToast(`LA_GAILLARDE ${glrdJour} — ${result.data.saved} PS sauvegardés ✓`, 'ok');
+    } else {
+      glrdToast('Erreur sauvegarde : ' + (result?.error || 'inconnue'), 'err');
+    }
+  } catch(e) {
+    glrdToast('Timeout — vérifie la connexion et réessaie', 'warn');
+    console.error('glrdSauvegarder error:', e);
+  } finally {
+    if (btn) { btn.textContent = '💾 Sauvegarder'; btn.disabled = false; }
+  }
+}
+
+function glrdUpdateStats() {
+  const rows = glrdState[glrdJour] || [];
+  const allRows = rows; // 1 objet = 1 PS
+
+  // Compteurs
+  let nbPS = 0, nbBenv = 0, totCOM = 0, totCRS = 0, totCMV = 0;
+  const vehCount = {}, benvCount = {};
+
+  allRows.forEach(r => {
+    if (!r.NUM_PS) return;
+    nbPS++;
+    totCOM += (r.NB_COM||0);
+    totCRS += (r.NB_CRS||0);
+    totCMV += (r.NB_CMV||0);
+    [r.REFERENT, r.ACC_1, r.ACC_2, r.ACC_3, r.ACC_4].forEach(b => {
+      if (!b) return;
+      nbBenv++;
+      benvCount[b] = (benvCount[b]||0) + 1;
+    });
+    if (r.VEH_A) vehCount[r.VEH_A] = (vehCount[r.VEH_A]||0) + 1;
+    if (r.VEH_B) vehCount[r.VEH_B] = (vehCount[r.VEH_B]||0) + 1;
+  });
+
+  // Stats bar
+  document.getElementById('glrdStatPS').textContent   = '● PS actifs : ' + nbPS;
+  document.getElementById('glrdStatBenv').textContent = '● Bénévoles : ' + nbBenv;
+  document.getElementById('glrdStatCOM').textContent  = 'COM ' + totCOM + '/' + RADIO_MAX.com;
+  document.getElementById('glrdStatCRS').textContent  = 'CRS ' + totCRS + '/' + RADIO_MAX.crs;
+  document.getElementById('glrdStatCMV').textContent  = 'CMV ' + totCMV + '/' + RADIO_MAX.cmv;
+
+  // Couleur rouge si dépassement
+  document.getElementById('glrdStatCOM').style.color = totCOM > RADIO_MAX.com ? '#C0392B' : '#2980B9';
+  document.getElementById('glrdStatCRS').style.color = totCRS > RADIO_MAX.crs ? '#C0392B' : '#006064';
+  document.getElementById('glrdStatCMV').style.color = totCMV > RADIO_MAX.cmv ? '#C0392B' : '#1E8449';
+
+  // Alertes doublons
+  const alerts = [];
+
+  // Doublons bénévoles
+  Object.entries(benvCount).forEach(([b, cnt]) => {
+    if (cnt > 1) alerts.push(`⚠ Bénévole <strong>${glrdNomAff(b)}</strong> affecté ${cnt}× sur ${glrdJour} LA_GAILLARDE`);
+  });
+
+  // Doublons véhicules dans LG
+  Object.entries(vehCount).forEach(([veh, cnt]) => {
+    if (cnt > 1) alerts.push(`🚗 Véhicule <strong>${veh}</strong> utilisé ${cnt}× dans LA_GAILLARDE`);
+  });
+
+  // Doublons véhicules cross-secteurs (LG vs Tous Secteurs)
+  const vehTousSecteurs = {};
+  (state[glrdJour] || []).forEach(s => {
+    if (s.secteur === 'LA_GAILLARDE') return; // déjà compté dans LG
+    s.rows.forEach(r => {
+      if (r.vehA) vehTousSecteurs[r.vehA] = s.secteur;
+      if (r.vehB) vehTousSecteurs[r.vehB] = s.secteur;
+    });
+  });
+  Object.keys(vehCount).forEach(veh => {
+    if (vehTousSecteurs[veh]) {
+      alerts.push(`🚗 Véhicule <strong>${veh}</strong> aussi dans secteur <strong>${vehTousSecteurs[veh]}</strong> — vérifier !`);
+    }
+  });
+
+  const bar = document.getElementById('glrdAlertsBar');
+  if (alerts.length) {
+    bar.style.display = 'block';
+    bar.innerHTML = alerts.map(a => `<div style="font-size:12px;padding:2px 0">${a}</div>`).join('');
+    // BIP seulement si dépassement radio OU doublon
+    const hasRadioOver = totCOM > RADIO_MAX.com || totCRS > RADIO_MAX.crs || totCMV > RADIO_MAX.cmv;
+    const newAlertCount = alerts.length + (hasRadioOver ? 1 : 0);
+    if (newAlertCount > 0 && newAlertCount !== (glrdUpdateStats._lastAlertCount || 0)) {
+      try {
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const bip = (freq, start, dur) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.frequency.value = freq; o.type = 'sine';
+          g.gain.setValueAtTime(0.3, ctx.currentTime + start);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+          o.start(ctx.currentTime + start); o.stop(ctx.currentTime + start + dur);
+        };
+        bip(880, 0, 0.12); bip(880, 0.16, 0.12);
+      } catch(e) {}
+    }
+    glrdUpdateStats._lastAlertCount = newAlertCount;
+  } else {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  }
+}
+
+function glrdRenderFiches() {
+  const rows = glrdState[glrdJour] || [];
+  const jourInfo = JOURS.find(j => j.id === glrdJour);
+
+  // Peupler sélecteur bénévole
+  const benvoles = new Set();
+  rows.forEach(r => {
+    [r.REFERENT, r.ACC_1, r.ACC_2, r.ACC_3, r.ACC_4].forEach(b => { if(b) benvoles.add(b); });
+  });
+  const selBenv = document.getElementById('glrdBenvSelect');
+  const prevBenv = selBenv.value;
+  selBenv.innerHTML = '<option value="">— Tous —</option>' +
+    [...benvoles].sort((a,b)=>glrdNomAff(a).localeCompare(glrdNomAff(b),'fr')).map(b => `<option value="${b}" ${b===prevBenv?'selected':''}>${glrdNomAff(b)}</option>`).join('');
+
+  // Peupler sélecteur PS
+  const selPS = document.getElementById('glrdPSFicheSelect');
+  const prevPS = selPS.value;
+  selPS.innerHTML = '<option value="">— Tous —</option>' +
+    rows.filter(r => r.NUM_PS).map(r => `<option value="${r.NUM_PS}" ${r.NUM_PS===prevPS?'selected':''}>${r.NUM_PS}</option>`).join('');
+
+  glrdApplyFilter();
+}
+
+function glrdFilterByBenv() {
+  // Désactiver filtre PS quand bénévole est choisi
+  const selBenv = document.getElementById('glrdBenvSelect');
+  const selPS   = document.getElementById('glrdPSFicheSelect');
+  if (selBenv.value) selPS.value = '';
+  glrdApplyFilter();
+}
+
+function glrdFilterByPS() {
+  // Désactiver filtre bénévole quand PS est choisi
+  const selBenv = document.getElementById('glrdBenvSelect');
+  const selPS   = document.getElementById('glrdPSFicheSelect');
+  if (selPS.value) selBenv.value = '';
+  glrdApplyFilter();
+}
+
+function glrdApplyFilter() {
+  const rows = glrdState[glrdJour] || [];
+  const jourInfo = JOURS.find(j => j.id === glrdJour);
+  const filterBenv = document.getElementById('glrdBenvSelect').value;
+  const filterPS   = document.getElementById('glrdPSFicheSelect').value;
+
+  let filtered = rows;
+  if (filterBenv) {
+    filtered = rows.filter(r => [r.REFERENT,r.ACC_1,r.ACC_2,r.ACC_3,r.ACC_4].includes(filterBenv));
+  } else if (filterPS) {
+    filtered = rows.filter(r => r.NUM_PS === filterPS);
+  }
+
+  const body = document.getElementById('glrdFichesBody');
+  if (!filtered.length) {
+    body.innerHTML = '<div style="text-align:center;color:#aaa;padding:30px;font-style:italic">Aucune fiche pour ce filtre</div>';
+    return;
+  }
+  body.innerHTML = filtered.map(r => glrdFicheHTML(r, jourInfo)).join('');
+}
+
+function glrdFicheHTML(r, jourInfo) {
+  const accompagnants = [r.ACC_1, r.ACC_2, r.ACC_3, r.ACC_4].filter(Boolean).map(glrdNomAff).join(', ');
+  const vehicules     = [r.VEH_A, r.VEH_B].filter(Boolean).join(' + ');
+  const radios        = [
+    r.NB_COM ? `${r.NB_COM} COM` : '',
+    r.NB_CRS ? `${r.NB_CRS} CRS` : '',
+    r.NB_CMV ? `${r.NB_CMV} CMV` : '',
+  ].filter(Boolean).join(' · ');
+  const courses = [r.COURSE_1,r.COURSE_2,r.COURSE_3,r.COURSE_4].filter(Boolean);
+  const comms   = [r.COMM_A, r.COMM_B].filter(Boolean); // COMM_C → Report Jx uniquement
+
+  const telRef = (REFERANTS.find(rf => rf.nom === r.MEP_PAR)||{}).tel ||
+                 (glrdFindBenev(r.MEP_PAR)||{}).tel || '';
+
+  return `
+    <div class="glrd-fiche">
+      <div class="glrd-fiche-header">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:1px">
+            ${titreEvt()} — FICHE DE POSTE
+          </div>
+          <div style="font-size:13px;opacity:.85">${jourInfo.label} — ${jourInfo.date} · SECTEUR LA_GAILLARDE</div>
+        </div>
+        <div style="text-align:right;font-family:'Barlow Condensed',sans-serif">
+          <div style="font-size:22px;font-weight:900">${r.NUM_PS || '—'}</div>
+          <div style="font-size:12px;opacity:.8">${r.LIEU_DIT || ''}</div>
+        </div>
+      </div>
+      <div class="glrd-fiche-body">
+
+        <div class="glrd-fiche-section">👤 Signaleurs</div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Signaleur Référent</span>
+          <span class="glrd-fiche-val"><strong style="font-size:14px">${glrdNomAff(r.REFERENT) || '—'}</strong></span>
+        </div>
+        ${accompagnants ? `<div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Accompagnants</span>
+          <span class="glrd-fiche-val">${accompagnants}</span>
+        </div>` : ''}
+
+        <div class="glrd-fiche-section">🚗 Logistique</div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Véhicule(s)</span>
+          <span class="glrd-fiche-val">${vehicules || '—'}</span>
+        </div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Mise en place par</span>
+          <span class="glrd-fiche-val">${glrdNomAff(r.MEP_PAR) || '—'}</span>
+        </div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">RDV MeP</span>
+          <span class="glrd-fiche-val">${r.MEP_LIEU || '—'}</span>
+        </div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Heure RDV MeP</span>
+          <span class="glrd-fiche-val"><strong>${r.HMEP_RDV || r.HMEP || '—'}</strong></span>
+        </div>
+
+        <div class="glrd-fiche-section" style="background:#1A3A5C;color:#fff;margin:10px 0">📍 Point Signaleur</div>
+        <div style="padding:10px 0;text-align:center">
+          <div style="font-size:26px;font-weight:900;color:#1A3A5C;letter-spacing:1px">${r.NUM_PS || '—'}</div>
+          <div style="font-size:15px;font-weight:700;color:#333;margin-top:4px">${r.LIEU_DIT || ''}</div>
+        </div>
+
+        <div class="glrd-fiche-section">📍 Distances & Radios</div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Ravitaillement</span>
+          <span class="glrd-fiche-val">${r.KM_RAVIT ? r.KM_RAVIT + ' km' : '—'}</span>
+        </div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Assistance</span>
+          <span class="glrd-fiche-val">${r.KM_ATELIER ? r.KM_ATELIER + ' km' : '—'}</span>
+        </div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Radio(s)</span>
+          <span class="glrd-fiche-val">${radios || '—'}</span>
+        </div>
+        ${courses.length ? `
+        <div class="glrd-fiche-section">🏁 Courses du jour</div>
+        ${courses.map((c,i) => `<div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Course ${i+1}</span>
+          <span class="glrd-fiche-val">${c}</span>
+        </div>`).join('')}` : ''}
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">1er Participant</span>
+          <span class="glrd-fiche-val">${r.PREMIER_PART ? 'vers ' + r.PREMIER_PART : '—'}</span>
+        </div>
+
+        <div class="glrd-fiche-section">🚨 Urgences</div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">En cas d'accident</span>
+          <span class="glrd-fiche-val">PC ROC sur <strong>RADIO COURSE</strong></span>
+        </div>
+        <div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">Contact MeP</span>
+          <span class="glrd-fiche-val">${glrdNomAff(r.MEP_PAR) || '—'}${telRef ? ' — 📞 ' + telRef : ''}</span>
+        </div>
+
+        ${comms.length ? `
+        <div class="glrd-fiche-section">📝 Commentaires</div>
+        ${comms.map((c,i) => `<div class="glrd-fiche-row">
+          <span class="glrd-fiche-label">${String.fromCharCode(65+i)}.</span>
+          <span class="glrd-fiche-val">${c}</span>
+        </div>`).join('')}` : ''}
+
+        <div style="margin-top:14px;padding:10px;background:#F8F9FA;border-radius:4px;
+          font-size:11px;color:#555;text-align:center">
+          Vos missions : Guider les coureurs sur le parcours · Signaler les incidents
+          · <strong>Merci pour votre participation !</strong>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function glrdImprimerFiches() {
+  // Basculer sur l'onglet Fiches si pas déjà actif
+  document.querySelectorAll('.glrd-tab').forEach((b,i) => b.classList.toggle('active', i===1));
+  document.querySelectorAll('.glrd-tab-content').forEach((c,i) => c.classList.toggle('active', i===1));
+  // On imprime exactement ce qui est affiché : « — Tous — » = tous les PS (1 page par PS),
+  // un PS ou un bénévole choisi = seulement ses fiches.
+  glrdRenderFiches();   // conserve les filtres en cours (les menus gardent leur valeur) et réaffiche
+  document.body.classList.add('print-gaillarde');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-gaillarde'), 1000);
+}
+
+// ── REPORT Jx ────────────────────────────────────────────────────────────────
+function glrdRenderReport() {
+  const rows = glrdState[glrdJour] || [];
+  const jourInfo = JOURS.find(j => j.id === glrdJour);
+  const body = document.getElementById('glrdReportBody');
+
+  if (!rows.length) {
+    body.innerHTML = `<div style="text-align:center;color:#aaa;padding:30px;font-style:italic">
+      Aucune saisie pour ${glrdJour}</div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;
+      color:#1A3A5C;margin-bottom:12px">
+      ${titreEvt()} — REPORT ${glrdJour} · LA_GAILLARDE · ${jourInfo.date}
+    </div>
+    <table class="glrd-report-table">
+      <thead>
+        <tr>
+          <th>N° PS & Lieu-dit</th>
+          <th>Signaleur Référent</th>
+          <th>Téléphone</th>
+          <th>Signaleurs accompagnants</th>
+          <th>Véhicule(s)</th>
+          <th>H MeP</th>
+          <th>Radios</th>
+          <th>Observations</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => {
+          const tel = (() => {
+            if (!r.REFERENT) return '';
+            const exact = glrdFindBenev(r.REFERENT);
+            if (exact) return exact.tel || '';
+            // Fallback : chercher par NOM seul (premier mot)
+            const nomSeul = r.REFERENT.split(' ')[0];
+            const approx = glrdBenev().data.find(b => b.nom.startsWith(nomSeul)) || BENEVOLES_DATA.find(b => b.nom.startsWith(nomSeul));
+            return approx ? approx.tel || '' : '';
+          })();
+          const accompagnants = [r.ACC_1,r.ACC_2,r.ACC_3,r.ACC_4].filter(Boolean).map(glrdNomAff).join(', ');
+          const vehicules = [r.VEH_A,r.VEH_B].filter(Boolean).join(' + ');
+          const radios = [
+            r.NB_COM ? `${r.NB_COM} COM` : '',
+            r.NB_CRS ? `${r.NB_CRS} CRS` : '',
+            r.NB_CMV ? `${r.NB_CMV} CMV` : '',
+          ].filter(Boolean).join(' · ');
+          const obs = [r.COMM_A,r.COMM_B,r.COMM_C].filter(Boolean).join(' / ');
+          return `<tr>
+            <td><strong>${r.NUM_PS||'—'}</strong><br><span style="font-size:11px;color:#666">${r.LIEU_DIT||''}</span></td>
+            <td>${glrdNomAff(r.REFERENT)||'—'}</td>
+            <td style="color:#E67E22;font-size:12px">${tel}</td>
+            <td style="font-size:12px">${accompagnants||'—'}</td>
+            <td>${vehicules||'—'}</td>
+            <td><strong style="color:#C0392B">${r.HMEP||'—'}</strong></td>
+            <td style="font-size:12px">${radios||'—'}</td>
+            <td style="font-size:11px;color:#666">${obs}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <button class="btn-fiche-print" onclick="glrdImprimerReport()" style="margin-top:14px">🖨 Imprimer ce report</button>
+  `;
+}
+
+function glrdImprimerReport() {
+  document.querySelectorAll('.glrd-tab').forEach((b,i) => b.classList.toggle('active', i===2));
+  document.querySelectorAll('.glrd-tab-content').forEach((c,i) => c.classList.toggle('active', i===2));
+  glrdRenderReport();
+  document.body.classList.add('print-gaillarde');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-gaillarde'), 1000);
+}
+
+function closeReport() {
+  document.getElementById('reportOverlay').classList.remove('active');
+}
+
+// ========================================================
+// FICHE SECTEUR
+// ========================================================
+// ── Regroupement « PS sans secteur » (blocs solo « PS xxx ») pour Fiche Secteur / Fiches PS ──
+const GROUPE_SOLO       = '__SOLO_TOUS__';
+const GROUPE_SOLO_LABEL = '★ PS sans secteur (tous)';
+
+// Blocs solo du jour qui contiennent au moins un PS saisi
+function blocsSoloJour(jourId) {
+  return (state[jourId] || []).filter(sd => estSolo(sd.secteur) && (sd.rows || []).some(r => r.ps));
+}
+
+// Données « virtuelles » du groupe : un seul bloc, lignes triées par n° de PS (le référent de chaque bloc est conservé dans _ref)
+function sectDataGroupeSolo(jourId) {
+  const blocs = blocsSoloJour(jourId);
+  const rows = [];
+  blocs.forEach(sd => (sd.rows || []).filter(r => r.ps).forEach(r =>
+    rows.push(Object.assign({}, r, { _ref: sd.referant || '', _tel: sd.telReferant || '', _sect: sd.secteur }))));
+  rows.sort((a, b) => (parseInt(a.ps, 10) || 0) - (parseInt(b.ps, 10) || 0) || String(a.ps).localeCompare(String(b.ps)));
+  const comms = [];
+  blocs.forEach(sd => (sd.commentaires || []).filter(Boolean).forEach(c => comms.push(c)));
+  return { secteur: 'PS sans secteur', referant: '', telReferant: '', hmepSect: '', commentaires: comms, rows, _groupe: true };
+}
+
+// Données d'un « secteur » pour les fiches : vrai secteur ou groupe virtuel
+function sectDataFiche(secteurNom, jourId) {
+  if (secteurNom === GROUPE_SOLO) return sectDataGroupeSolo(jourId);
+  return (state[jourId] || []).find(s => s.secteur === secteurNom);
+}
+
+// Options du menu secteur pour un jour : groupe ★, secteurs normaux, puis PS sans secteur un par un
+function optionsSecteursFiches(jourId) {
+  const dispos = [...new Set([
+    ...SECTEURS,
+    ...(state[jourId] || []).map(s => s.secteur)
+  ])].filter(s => s !== SOLO_VIDE);
+  const normaux = dispos.filter(s => !estSolo(s));
+  const solos   = dispos.filter(s => estSolo(s) && (state[jourId] || []).some(sd => sd.secteur === s));
+  let h = '';
+  if (blocsSoloJour(jourId).length) h += `<option value="${GROUPE_SOLO}">${GROUPE_SOLO_LABEL}</option>`;
+  h += normaux.map(s => `<option value="${attrEsc(s)}">${s}</option>`).join('');
+  if (solos.length) h += `<optgroup label="PS sans secteur (un par un)">` +
+    solos.map(s => `<option value="${attrEsc(s)}">${s}</option>`).join('') + `</optgroup>`;
+  return h;
+}
+
+// Remplit un menu secteur pour un jour en gardant la sélection si elle existe encore
+function remplirMenuSecteursFiches(selSect, jourId, preferer) {
+  const avant = preferer || selSect.value;
+  selSect.innerHTML = optionsSecteursFiches(jourId);
+  if ([...selSect.options].some(o => o.value === avant)) selSect.value = avant;
+}
+
+function openFicheSecteur() {
+  // Remplir les selects
+  const selSect = document.getElementById('fsSecteurSelect');
+  const selJour = document.getElementById('fsJourSelect');
+
+  selJour.innerHTML = JOURS.map(j =>
+    `<option value="${j.id}" ${j.id === currentJour ? 'selected' : ''}>${j.label} — ${j.date}</option>`
+  ).join('');
+
+  // Secteurs présents dans le state du jour courant + tous secteurs connus (+ groupe « PS sans secteur »)
+  const premierSect = (state[currentJour] || [])[0];
+  remplirMenuSecteursFiches(selSect, currentJour, premierSect ? premierSect.secteur : '');
+
+  document.getElementById('ficheSectOverlay').classList.add('active');
+  renderFicheSecteur();
+}
+
+// Changement de jour : on reconstruit la liste des secteurs de CE jour (les PS sans secteur diffèrent d'un jour à l'autre)
+function fsChangeJour() {
+  remplirMenuSecteursFiches(document.getElementById('fsSecteurSelect'), document.getElementById('fsJourSelect').value);
+  renderFicheSecteur();
+}
+
+function closeFicheSecteur() {
+  document.getElementById('ficheSectOverlay').classList.remove('active');
+}
+
+function imprimerFicheSecteur() {
+  document.body.classList.remove('print-report', 'print-fiches-ps');
+  document.body.classList.add('print-fiche-sect');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-fiche-sect'), 1000);
+}
+
+function imprimerReport() {
+  document.body.classList.remove('print-fiche-sect', 'print-fiches-ps');
+  document.body.classList.add('print-report');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-report'), 1000);
+}
+
+// ========================================================
+// FICHES PS — impression multi-PS
+// ========================================================
+let fpsSelectedPS = new Set(); // PS sélectionnés
+
+function openFichesPS() {
+  const selSect = document.getElementById('fpsSecteurSelect');
+  const selJour = document.getElementById('fpsJourSelect');
+
+  // Peupler jours
+  selJour.innerHTML = JOURS.map(j =>
+    `<option value="${j.id}" ${j.id === currentJour ? 'selected' : ''}>${j.label} — ${j.date}</option>`
+  ).join('');
+
+  // Peupler secteurs (+ groupe « PS sans secteur »)
+  const premierSect = (state[currentJour] || [])[0];
+  remplirMenuSecteursFiches(selSect, currentJour, premierSect ? premierSect.secteur : '');
+
+  document.getElementById('fichesPSOverlay').classList.add('active');
+  renderFichesPS();
+}
+
+// Changement de jour : liste des secteurs reconstruite pour CE jour
+function fpsChangeJour() {
+  remplirMenuSecteursFiches(document.getElementById('fpsSecteurSelect'), document.getElementById('fpsJourSelect').value);
+  renderFichesPS();
+}
+
+function closeFichesPS() {
+  document.getElementById('fichesPSOverlay').classList.remove('active');
+}
+
+function imprimerFichesPS() {
+  document.body.classList.remove('print-fiche-sect', 'print-report');
+  document.body.classList.add('print-fiches-ps');
+  window.print();
+  setTimeout(() => document.body.classList.remove('print-fiches-ps'), 1000);
+}
+
+function fpsChangeSecteur() {
+  renderFichesPS();
+}
+
+function fpsToutSelectionner() {
+  document.querySelectorAll('.fps-ps-btn').forEach(b => {
+    b.classList.add('active');
+    fpsSelectedPS.add(b.dataset.ps);
+  });
+  renderFichesPSCards();
+}
+
+function fpsToutDeselectionner() {
+  document.querySelectorAll('.fps-ps-btn').forEach(b => b.classList.remove('active'));
+  fpsSelectedPS.clear();
+  renderFichesPSCards();
+}
+
+function fpsTogglePS(psStr) {
+  const btn = document.querySelector(`.fps-ps-btn[data-ps="${psStr}"]`);
+  if (fpsSelectedPS.has(psStr)) {
+    fpsSelectedPS.delete(psStr);
+    btn?.classList.remove('active');
+  } else {
+    fpsSelectedPS.add(psStr);
+    btn?.classList.add('active');
+  }
+  renderFichesPSCards();
+}
+
+function renderFichesPS() {
+  const secteurNom = document.getElementById('fpsSecteurSelect').value;
+  const jourId     = document.getElementById('fpsJourSelect').value;
+
+  // Trouver les données du secteur
+  const sectData = sectDataFiche(secteurNom, jourId);
+  const rows     = sectData ? sectData.rows.filter(r => r.ps) : [];
+
+  // Peupler le sélecteur de PS
+  const sel = document.getElementById('fpsPSSelector');
+  sel.innerHTML = rows.length
+    ? rows.map(r => `
+        <button class="fps-ps-btn" data-ps="${r.ps}"
+          onclick="fpsTogglePS('${r.ps.replace(/'/g,"\\'")}')">
+          ${r.ps.split(' - ')[0] || r.ps}
+        </button>`).join('')
+    : `<span style="font-size:12px;color:var(--texte2);font-style:italic">${secteurNom === GROUPE_SOLO ? 'Aucun PS sans secteur saisi ce jour' : 'Aucun PS saisi pour ce secteur ce jour'}</span>`;
+
+  // Ajouter CSS boutons PS si pas encore fait
+  if (!document.getElementById('fpsBtnStyle')) {
+    const style = document.createElement('style');
+    style.id = 'fpsBtnStyle';
+    style.textContent = `
+      .fps-ps-btn {
+        padding:4px 10px;border-radius:4px;border:1px solid var(--border);
+        background:var(--dark3);color:var(--texte2);cursor:pointer;
+        font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;
+        letter-spacing:0.5px;transition:all 0.15s;
+      }
+      .fps-ps-btn:hover { border-color:var(--bleu);color:var(--texte); }
+      .fps-ps-btn.active { background:var(--bleu);border-color:var(--bleu);color:#fff; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Sélectionner tous par défaut au changement de secteur/jour
+  fpsSelectedPS.clear();
+  rows.forEach(r => fpsSelectedPS.add(r.ps));
+  document.querySelectorAll('.fps-ps-btn').forEach(b => b.classList.add('active'));
+
+  renderFichesPSCards();
+}
+
+// ── Fiche de Poste (Tous Secteurs) — MÊME modèle que la fiche de poste LA_GAILLARDE (glrdFicheHTML, inchangée) ──
+// Les lignes sans donnée (mise en place, km, courses, 1er participant, commentaires) ne sont pas imprimées.
+function ficheDePosteTS(r, c) {
+  const e = v => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const row = (lab, val) => `<div class="glrd-fiche-row"><span class="glrd-fiche-label">${lab}</span><span class="glrd-fiche-val">${val}</span></div>`;
+  const sect = t => `<div class="glrd-fiche-section">${t}</div>`;
+  const telDeNom = n => (REFERANTS.find(x => x.nom === n) || {}).tel || (BENEVOLES_DATA.find(x => x.nom === n) || {}).tel || '';
+  const m = /^\s*([^-]+?)\s*-\s*(.+)$/.exec(String(r.ps || ''));
+  const num = m ? m[1] : String(r.ps || '—'), lieu = m ? m[2] : '';
+  const signaleurs = [r.b1, r.b2, r.b3, r.b4, r.b5].filter(Boolean).map(b => e(nomAff(b))).join(', ');
+  const vehicules  = [r.vehA, r.vehB].filter(Boolean).map(e).join(' + ');
+  const radios = [r.com ? `${r.com} COM` : '', r.crs ? `${r.crs} CRS` : '', r.cmv ? `${r.cmv} CMV` : ''].filter(Boolean).join(' · ');
+  const courses = (Array.isArray(r.courses) ? r.courses : []).filter(Boolean);
+  const hRdv = r.hmepRdv || r.hmep || '';
+  const telMep = r.mepPar ? telDeNom(r.mepPar) : '';
+  const comms = [r.commA, r.commB].filter(Boolean);
+  const refAff = c.refNom ? e(nomAff(c.refNom)) : '';
+  return `
+    <div class="glrd-fiche">
+      <div class="glrd-fiche-header">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:1px">
+            ${titreEvt()} — FICHE DE POSTE
+          </div>
+          <div style="font-size:13px;opacity:.85">${c.jourInfo.label} — ${c.jourInfo.date}${c.sansSect ? '' : ' · SECTEUR ' + e(c.secteurNom)}</div>
+        </div>
+        <div style="text-align:right;font-family:'Barlow Condensed',sans-serif">
+          <div style="font-size:22px;font-weight:900">${e(num)}</div>
+          <div style="font-size:12px;opacity:.8">${e(lieu)}</div>
+        </div>
+      </div>
+      <div class="glrd-fiche-body">
+        ${sect('👤 Signaleurs')}
+        ${row('Référent secteur', `<strong style="font-size:14px">${refAff || '—'}</strong>${c.tel ? ' — 📞 ' + e(c.tel) : ''}`)}
+        ${row('Signaleurs', signaleurs || '—')}
+
+        ${sect('🚗 Logistique')}
+        ${row('Véhicule(s)', vehicules || '—')}
+        ${r.mepPar ? row('Mise en place par', e(nomAff(r.mepPar))) : ''}
+        ${r.mepLieu ? row('RDV MeP', e(r.mepLieu)) : ''}
+        ${row('Heure RDV MeP', `<strong>${e(hRdv) || '—'}</strong>`)}
+        ${c.hmepSect ? row('H MeP secteur', e(c.hmepSect)) : ''}
+
+        <div class="glrd-fiche-section" style="background:#1A3A5C;color:#fff;margin:10px 0">📍 Point Signaleur</div>
+        <div style="padding:10px 0;text-align:center">
+          <div style="font-size:26px;font-weight:900;color:#1A3A5C;letter-spacing:1px">${e(num)}</div>
+          <div style="font-size:15px;font-weight:700;color:#333;margin-top:4px">${e(lieu)}</div>
+        </div>
+
+        ${sect('📍 Distances & Radios')}
+        ${r.kmRavit ? row('Ravitaillement', e(r.kmRavit) + ' km') : ''}
+        ${r.kmAtelier ? row('Assistance', e(r.kmAtelier) + ' km') : ''}
+        ${row('Radio(s)', radios || '—')}
+        ${courses.length ? sect('🏁 Courses du jour') + courses.map((x, i) => row('Course ' + (i + 1), e(x))).join('') : ''}
+        ${r.premierPart ? row('1er Participant', 'vers ' + e(r.premierPart)) : ''}
+
+        ${sect('🚨 Urgences')}
+        ${row("En cas d'accident", 'PC ROC sur <strong>RADIO COURSE</strong>')}
+        ${row('Contact référent', `${refAff || '—'}${c.tel ? ' — 📞 ' + e(c.tel) : ''}`)}
+        ${r.mepPar ? row('Contact MeP', `${e(nomAff(r.mepPar))}${telMep ? ' — 📞 ' + e(telMep) : ''}`) : ''}
+
+        ${(comms.length || r.obs) ? sect('📝 Commentaires') + comms.map((x, i) => row(String.fromCharCode(65 + i) + '.', e(x))).join('') + (r.obs ? row('Observations', e(r.obs)) : '') : ''}
+
+        <div style="margin-top:14px;padding:10px;background:#F8F9FA;border-radius:4px;
+          font-size:11px;color:#555;text-align:center">
+          Vos missions : Guider les coureurs sur le parcours · Signaler les incidents
+          · <strong>Merci pour votre participation !</strong>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderFichesPSCards() {
+  const secteurNom = document.getElementById('fpsSecteurSelect').value;
+  const jourId     = document.getElementById('fpsJourSelect').value;
+  const jourInfo   = JOURS.find(j => j.id === jourId);
+  const body       = document.getElementById('fichesPSBody');
+
+  const sectData = sectDataFiche(secteurNom, jourId);
+
+  if (!sectData) {
+    body.innerHTML = `<div class="fs-empty">Aucune saisie pour ${secteurNom === GROUPE_SOLO ? 'les PS sans secteur' : secteurNom} en ${jourId}</div>`;
+    return;
+  }
+
+  const rows = sectData.rows.filter(r => r.ps && fpsSelectedPS.has(r.ps));
+
+  if (!rows.length) {
+    body.innerHTML = `<div class="fs-empty">Sélectionner au moins un PS</div>`;
+    return;
+  }
+
+  const groupe = !!sectData._groupe;
+  const telDe = (nomRef, telSaisi) => telSaisi || (REFERANTS.find(r => r.nom === nomRef) || {}).tel || '';
+  const tel0 = telDe(sectData.referant, sectData.telReferant);
+  const isGaillarde = secteurNom === 'LA_GAILLARDE';
+  const titreFiches = groupe ? 'PS sans secteur' : (estSolo(secteurNom) ? 'PS sans secteur — ' + secteurNom : secteurNom);
+
+  let html = `
+    <div class="fs-titre" style="margin-bottom:2px">FICHES DE POSTE — ${titreFiches}</div>
+    <div class="fs-sous-titre">${jourInfo.date} (${jourId}) — ${rows.length} fiche(s) sélectionnée(s)</div>
+  `;
+
+  rows.forEach((r, idx) => {
+    const isLast   = idx === rows.length - 1;
+    const sansSect = groupe || estSolo(secteurNom);               // PS sans secteur : pas de nom de secteur à afficher
+    const refNom   = groupe ? (r._ref || '') : sectData.referant;
+    const tel      = groupe ? telDe(r._ref, r._tel) : tel0;
+    html += `<div class="fps-card ${isLast ? 'fps-last' : ''}" style="margin-bottom:20px">`
+         + ficheDePosteTS(r, { jourInfo, secteurNom, sansSect, refNom, tel, hmepSect: sectData.hmepSect })
+         + `</div>`;
+  });
+
+  html += `<button class="btn-fiche-print fps-no-print" onclick="imprimerFichesPS()">🖨 Imprimer ces fiches</button>`;
+  body.innerHTML = html;
+}
+
+// ========================================================
+// FICHE SECTEUR — rendu de la fiche
+// ========================================================
+function renderFicheSecteur() {
+  const secteurNom = document.getElementById('fsSecteurSelect').value;
+  const jourId     = document.getElementById('fsJourSelect').value;
+  const body       = document.getElementById('ficheSectBody');
+  const jourInfo   = JOURS.find(j => j.id === jourId);
+
+  // Trouver les données du secteur pour ce jour
+  const sectData = sectDataFiche(secteurNom, jourId);
+  const groupe   = !!(sectData && sectData._groupe);
+
+  if (!sectData) {
+    body.innerHTML = `<div class="fs-empty">Aucune saisie pour le secteur <strong>${secteurNom === GROUPE_SOLO ? 'PS sans secteur' : secteurNom}</strong> en ${jourId}.</div>`;
+    return;
+  }
+
+  const rows = sectData.rows.filter(r => r.ps);
+  const comms = (sectData.commentaires || []).filter(Boolean);
+
+  // ── Totaux secteur ───────────────────────────────────────────────────────
+  let totalCOM=0, totalCRS=0, totalCMV=0, totalBenv=0;
+  const vehs = new Set();
+  rows.forEach(r => {
+    totalCOM += (r.com||0); totalCRS += (r.crs||0); totalCMV += (r.cmv||0);
+    [r.b1,r.b2,r.b3,r.b4,r.b5].forEach(b => { if(b) totalBenv++; });
+    if(r.vehA) vehs.add(r.vehA);
+    if(r.vehB) vehs.add(r.vehB);
+  });
+
+  // ── HTML ─────────────────────────────────────────────────────────────────
+  let html = `
+    <div class="fs-titre">${groupe ? 'PS SANS SECTEUR' : 'SECTEUR ' + secteurNom}</div>
+    <div class="fs-sous-titre">
+      ${titreEvt()} — ${jourInfo.date} (${jourId})
+    </div>
+
+    <!-- IDENTIFICATION -->
+    <div class="fs-section">
+      <div class="fs-section-header">📍 Identification</div>
+      <div class="fs-section-body">
+        <div class="fs-info-grid">
+          <div class="fs-info-item">
+            <div class="fs-info-label">Secteur</div>
+            <div class="fs-info-val bleu">${groupe ? 'PS sans secteur' : secteurNom}</div>
+          </div>
+          <div class="fs-info-item">
+            <div class="fs-info-label">Référent</div>
+            <div class="fs-info-val">${groupe ? '(voir chaque PS)' : (nomAff(sectData.referant, sectData.secteur) || '—')}</div>
+          </div>
+          <div class="fs-info-item">
+            <div class="fs-info-label">H MeP Secteur</div>
+            <div class="fs-info-val rouge">${sectData.hmepSect || '—'}</div>
+          </div>
+          <div class="fs-info-item">
+            <div class="fs-info-label">Jour</div>
+            <div class="fs-info-val">${jourInfo.date}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POINTS SIGNALEURS -->
+    <div class="fs-section">
+      <div class="fs-section-header">🗺 Points Signaleurs (${rows.length})</div>
+      <div class="fs-section-body" style="padding:0">`;
+
+  if (rows.length === 0) {
+    html += `<div class="fs-empty">Aucun PS saisi pour ce secteur ce jour.</div>`;
+  } else {
+    html += `
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>PS / Lieu-dit</th>
+              <th>H MeP</th>
+              <th>Véh A</th>
+              <th>Véh B</th>
+              <th>Bénévoles</th>
+              <th>Radios</th>
+              <th>Course(s)</th>
+              <th>Km Ravit.</th>
+              <th>Km Atelier</th>
+              <th>Observations</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    rows.forEach(r => {
+      const benvs = [r.b1,r.b2,r.b3,r.b4,r.b5].filter(Boolean).map(b => nomAff(b, sectData.secteur)).join('<br>');
+      const radios = [
+        r.com ? `<span class="fs-radio-pill com">${r.com} COM</span>` : '',
+        r.crs ? `<span class="fs-radio-pill crs">${r.crs} CRS</span>` : '',
+        r.cmv ? `<span class="fs-radio-pill cmv">${r.cmv} CMV</span>` : '',
+      ].join('');
+      const courses = (Array.isArray(r.courses) ? r.courses : []).filter(Boolean)
+        .map(c => `<span class="fs-course-tag">${c}</span>`).join('');
+      const kmRavit   = r.kmRavit   || '<span style="color:#ccc">—</span>';
+      const kmAtelier = r.kmAtelier || '<span style="color:#ccc">—</span>';
+
+      html += `
+            <tr>
+              <td><strong>${r.ps}</strong>${groupe ? `<br><span style="font-size:10px;color:#555">Réf. : ${nomAff(r._ref) || '—'}</span>` : ''}</td>
+              <td><strong style="color:#C0392B">${r.hmep || '—'}</strong></td>
+              <td>${r.vehA || '—'}</td>
+              <td>${r.vehB || '—'}</td>
+              <td>${benvs || '—'}</td>
+              <td>${radios || '—'}</td>
+              <td>${courses || '—'}</td>
+              <td>${kmRavit}</td>
+              <td>${kmAtelier}</td>
+              <td style="font-size:11px;color:#555">${r.obs || ''}</td>
+            </tr>`;
+    });
+
+    html += `</tbody></table>`;
+  }
+
+  html += `
+      </div>
+    </div>
+
+    ${comms.length ? `
+    <!-- COMMENTAIRES REFERANT -->
+    <div class="fs-section">
+      <div class="fs-section-header">📝 Commentaires pour le référant</div>
+      <div class="fs-section-body">
+        <ul class="fs-comm-list">
+          ${comms.map(c => `<li>${c}</li>`).join('')}
+        </ul>
+      </div>
+    </div>` : ''}
+
+    <!-- RECAP CHIFFRES -->
+    <div class="fs-section">
+      <div class="fs-section-header">📊 Récapitulatif</div>
+      <div class="fs-section-body">
+        <div class="fs-info-grid">
+          <div class="fs-info-item">
+            <div class="fs-info-label">PS actifs</div>
+            <div class="fs-info-val rouge">${rows.length}</div>
+          </div>
+          <div class="fs-info-item">
+            <div class="fs-info-label">Bénévoles</div>
+            <div class="fs-info-val vert">${totalBenv}</div>
+          </div>
+          <div class="fs-info-item">
+            <div class="fs-info-label">Véhicules</div>
+            <div class="fs-info-val bleu">${vehs.size}</div>
+          </div>
+          <div class="fs-info-item">
+            <div class="fs-info-label">Radios</div>
+            <div class="fs-info-val" style="font-size:12px">
+              ${totalCOM ? `<span style="color:#1A5276;font-weight:700">${totalCOM} COM</span> ` : ''}
+              ${totalCRS ? `<span style="color:#922B21;font-weight:700">${totalCRS} CRS</span> ` : ''}
+              ${totalCMV ? `<span style="color:#1E8449;font-weight:700">${totalCMV} CMV</span>` : ''}
+              ${!totalCOM && !totalCRS && !totalCMV ? '—' : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MISSIONS -->
+    <div class="fs-section">
+      <div class="fs-section-header">🚨 Missions & Urgences</div>
+      <div class="fs-section-body" style="font-size:12px;color:#333;line-height:1.7">
+        • Guider les coureurs sur le parcours<br>
+        • Signaler les incidents sur le parcours<br>
+        • <strong>En cas d'accident : contacter le PC ROC sur RADIO COURSE</strong>
+      </div>
+    </div>
+
+    <button class="btn-fiche-print" onclick="imprimerFicheSecteur()">🖨 Imprimer cette fiche</button>
+  `;
+
+  body.innerHTML = html;
+}
+
+
+// ========================================================
+// APPS SCRIPT — Connexion Google Sheets
+// L'adresse (APPS_SCRIPT_URL) est définie tout en haut du fichier
+// ========================================================
+const SHEETS_ENABLED  = APPS_SCRIPT_URL !== 'REMPLACER_PAR_URL_APPS_SCRIPT';
+
+// ── Appel Apps Script via JSONP (contourne les limitations CORS/redirect) ──
+function callAS(params, timeoutMs = 90000, rapide = false) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'cb_' + Math.random().toString(36).slice(2);
+    const timeout = setTimeout(() => {
+      // handler neutre : une réponse tardive ne provoque pas d'erreur dans la console
+      window[cbName] = () => { delete window[cbName]; };
+      reject(new Error('Timeout (' + Math.round(timeoutMs / 1000) + 's) — connexion lente ?'));
+    }, timeoutMs);
+    window[cbName] = (data) => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      resolve(data);
+    };
+    const qs = new URLSearchParams({ ...params, callback: cbName });
+    const s  = document.createElement('script');
+    s.src    = `${APPS_SCRIPT_URL}?${qs}`;
+   s.onerror = () => {
+      if (!rapide) { console.warn('JSONP onerror (redirect 302 probable) — on attend le timeout'); return; }
+      // Lecture / enregistrement : Google n'a pas livré la réponse → on abandonne tout de suite (la relance part aussitôt)
+      console.warn('JSONP onerror — réponse non livrée, relance immédiate');
+      clearTimeout(timeout);
+      window[cbName] = () => { delete window[cbName]; };
+      reject(new Error('Réponse non livrée par Google'));
+    };
+    document.head.appendChild(s);
+    setTimeout(() => s.remove(), timeoutMs + 5000);
+  });
+}
+
+// Retry automatique — disponible globalement
+async function callASRetry(params, maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await callAS(params);
+    } catch(e) {
+      if (attempt === maxRetries) throw e;
+      console.warn(`Tentative ${attempt} échouée, retry…`, e.message);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
+// Envoi d'une SAUVEGARDE : délai court par essai + relances rapides.
+// Sans risque : saveSaisie réécrit la journée entière (idempotent) et le serveur traite les envois l'un après l'autre (verrou).
+// Le serveur répond en 1 à 4 s ; si la réponse ne revient pas en ~20 s, elle s'est perdue → on relance tout de suite.
+const SAVE_TIMEOUTS = [20000, 25000, 30000, 40000];
+async function callASSave(params, onEssai) {
+  let derniere;
+  for (let i = 0; i < SAVE_TIMEOUTS.length; i++) {
+    if (onEssai) onEssai(i + 1, SAVE_TIMEOUTS.length);
+    try {
+      return await callAS(params, SAVE_TIMEOUTS[i], true);
+    } catch(e) {
+      derniere = e;
+      console.warn('Envoi : essai ' + (i + 1) + '/' + SAVE_TIMEOUTS.length + ' sans réponse', e.message);
+      if (i < SAVE_TIMEOUTS.length - 1) await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  throw derniere;
+}
+
+// Envoi de la journée. Journée « normale » : UN seul appel, comme en 2026 (adresse jusqu'à ~45 000 caractères, taille éprouvée).
+// Journée très chargée (volet Détails bien rempli) : découpage en parties de ~30 000 caractères, envoyées l'une après l'autre ;
+// le serveur n'écrit la journée qu'à l'arrivée de la dernière partie (rien n'est écrit tant que tout n'est pas arrivé).
+const SAVE_URL_MAX   = 45000;   // au-delà : envoi en parties
+const SAVE_PART_MAX  = 30000;   // taille visée par partie (adresse complète)
+function urlLen(o) { return new URLSearchParams(o).toString().length; }
+function decouperSaisie(jour, secteurs) {
+  const base = urlLen({ action: 'saveSaisie', jour, sid: 'xxxxxxxxxxxxxxxx', part: '10', parts: '10', callback: 'cb_xxxxxxxxxxxx', data: '' }) + 40;
+  const budget = SAVE_PART_MAX - base;
+  const parts = []; let cur = [], len = 2;
+  secteurs.forEach(s => {
+    const entete = { secteur: s.secteur, referant: s.referant, hmepSect: s.hmepSect };
+    let bloc = null;
+    (s.rows || []).forEach(r => {
+      const l = urlLen({ d: JSON.stringify(r) }) - 2 + 1;
+      const lEnt = urlLen({ d: JSON.stringify({ ...entete, rows: [] }) }) - 2 + 1;
+      if (bloc && len + l > budget) { parts.push(cur); cur = []; len = 2; bloc = null; }
+      if (!bloc) { bloc = { ...entete, rows: [] }; cur.push(bloc); len += lEnt; }
+      bloc.rows.push(r); len += l;
+    });
+  });
+  if (cur.length) parts.push(cur);
+  return parts;
+}
+async function envoyerSaisieJour(jour, secteurs, onEssai) {
+  const json = JSON.stringify(secteurs);
+  if (urlLen({ action: 'saveSaisie', jour, data: json, callback: 'cb_xxxxxxxxxxxx' }) <= SAVE_URL_MAX) {
+    return callASSave({ action: 'saveSaisie', jour, data: json }, onEssai);
+  }
+  const parts = decouperSaisie(jour, secteurs);
+  for (let tour = 1; tour <= 2; tour++) {                      // 2e tour seulement si le serveur a perdu des parties (cache)
+    const sid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    let rep = null;
+    for (let i = 0; i < parts.length; i++) {
+      rep = await callASSave({ action: 'saveSaisie', jour, sid, part: i + 1, parts: parts.length, data: JSON.stringify(parts[i]) }, onEssai);
+      if (!rep.ok) break;
+    }
+    if (rep && rep.ok) return rep;
+    if (!(rep && rep.error === 'PARTIES_MANQUANTES' && tour === 1)) return rep;
+  }
+}
+
+// Lecture de données : même principe que l'envoi (réponse perdue → relance rapide), la lecture ne modifie rien.
+// 5 essais : 18 s (le serveur répond en 1 à 5 s, 12 s au pire constaté), puis 20, 25, 30 et 45 s ; une réponse non livrée relance aussitôt.
+const LIRE_TIMEOUTS = [18000, 20000, 25000, 30000, 45000];
+async function callASLire(params) {
+  let derniere;
+  for (let i = 0; i < LIRE_TIMEOUTS.length; i++) {
+    try {
+      return await callAS(params, LIRE_TIMEOUTS[i], true);
+    } catch(e) {
+      derniere = e;
+      console.warn('Lecture ' + params.action + ' : essai ' + (i + 1) + '/' + LIRE_TIMEOUTS.length + ' sans réponse', e.message);
+      if (i < LIRE_TIMEOUTS.length - 1) await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  throw derniere;
+}
+
+// ── Cache navigateur des référentiels (par jour) ─────────────────────────────
+// But : si Google ne livre pas la réponse (lenteur constatée le 08/10), la page s'ouvre aussitôt avec les
+// dernières listes connues de ce jour, puis les met à jour en arrière-plan. Les listes ne sont JAMAIS inventées :
+// seulement celles reçues de Sheets lors d'un chargement précédent sur ce navigateur.
+const REF_CACHE_PREFIX = 'ra2027_ref_';
+function refCacheLire(jour) {
+  try {
+    const o = JSON.parse(localStorage.getItem(REF_CACHE_PREFIX + jour) || 'null');
+    if (o && o.d && Array.isArray(o.d.benevoles) && Array.isArray(o.d.secteurs) && Array.isArray(o.d.vehicules)) return o;
+  } catch(_) {}
+  return null;
+}
+function refCacheEcrire(jour, d) {
+  try { localStorage.setItem(REF_CACHE_PREFIX + jour, JSON.stringify({ t: Date.now(), d })); } catch(_) {}
+}
+function refHeure(t) { const x = new Date(t); return String(x.getHours()).padStart(2,'0') + 'h' + String(x.getMinutes()).padStart(2,'0'); }
+
+// Applique un jeu de référentiels (reçu de Sheets ou lu dans le cache navigateur) aux listes de la page.
+// Lève une erreur AVANT de modifier les listes Secteurs/Véhicules si elles sont vides.
+function appliquerReferentiels(d) {
+  // ── Mise à jour des listes dynamiques ──────────────────────────────────
+  // BENEVOLES      : tableau des NOM seuls  → valeur sauvegardée dans Sheets
+  // BENEVOLES_DATA : tableau {nom, label, tel}
+  //   - nom   = NOM seul  (ex: "Bénévole_003")    → stockage BENEVOLE_x
+  //   - label = NOM+PRENOM (ex: "Bénévole_003 Corinne") → affichage <option>
+  // BENEVOLES_LABEL : Map NOM seul → label complet  → utilisé dans renderPSRow
+  BENEVOLES.length = 0;
+  BENEVOLES_DATA.length = 0;
+  if (!window.BENEVOLES_LABEL) window.BENEVOLES_LABEL = {};
+  // Vider avant rechargement
+  Object.keys(BENEVOLES_LABEL).forEach(k => delete BENEVOLES_LABEL[k]);
+
+  d.benevoles.forEach(b => {
+    const nomSeul = b.nomSeul || b.nom.split(' ')[0]; // NOM seul (fallback si nomSeul absent)
+    const label   = b.nom;                             // NOM+PRENOM (affichage)
+    BENEVOLES.push(nomSeul);
+    BENEVOLES_DATA.push({ nom: nomSeul, label, tel: b.tel || '' });
+    BENEVOLES_LABEL[nomSeul] = label;
+    BENEVOLES_LABEL_CUMUL[nomSeul] = label;
+  });
+  // Liste complète (tous bénévoles, quel que soit le jour) fournie par le serveur depuis la v23
+  if (d.labelsTous && typeof d.labelsTous === 'object') {
+    Object.keys(d.labelsTous).forEach(k => { if (d.labelsTous[k]) BENEVOLES_LABEL_CUMUL[k] = d.labelsTous[k]; });
+  }
+
+  // ── Secteurs et véhicules : source de vérité = Sheets (REF_Secteurs / REF_Vehicules)
+  // Nettoyage : texte, trim, lignes vides ignorées, doublons supprimés, ordre du Sheet conservé.
+  // Les deux listes sont validées AVANT d'écraser quoi que ce soit.
+  const nettoyer = (arr) => {
+    const seen = new Set(), out = [];
+    (arr || []).forEach(x => {
+      const v = String(x && typeof x === 'object' ? x.nom : x).trim();
+      if (v && v !== 'undefined' && v !== 'null' && !seen.has(v)) { seen.add(v); out.push(v); }
+    });
+    return out;
+  };
+  const listeSect = nettoyer(d.secteurs);
+  const listeVeh  = nettoyer(d.vehicules);
+  if (!listeSect.length) throw new Error('REF_Secteurs vide ou illisible');
+  if (!listeVeh.length)  throw new Error('REF_Vehicules vide ou illisible');
+  SECTEURS.length = 0;  listeSect.forEach(v => SECTEURS.push(v));
+  // Activation par jour (colonnes J1–J5 de REF_Secteurs) : null = actif tous les jours
+  Object.keys(SECTEURS_JOURS).forEach(k => delete SECTEURS_JOURS[k]);
+  (d.secteurs || []).forEach(x => {
+    if (x && typeof x === 'object') SECTEURS_JOURS[String(x.nom).trim()] = Array.isArray(x.jours) ? x.jours : null;
+  });
+  VEHICULES.length = 0; listeVeh.forEach(v => VEHICULES.push(v));
+
+  // Référants : depuis REF_Referents (d.referants) si disponible, sinon depuis secteurs
+  REFERANTS.length = 0;
+  if (d.referants && d.referants.length) {
+    d.referants.forEach(r => REFERANTS.push({ nom: r.nom, tel: r.tel || '' }));
+  } else if (d.secteurs && d.secteurs.length) {
+    const seen = new Set();
+    d.secteurs.forEach(s => {
+      if (s.referant && !seen.has(s.referant)) {
+        seen.add(s.referant);
+        REFERANTS.push({ nom: s.referant, tel: s.tel || '' });
+      }
+    });
+  }
+
+  if (d.ps && d.ps.length) {
+    // Sauvegarder LA_GAILLARDE avant effacement (peut ne pas être dans REF_PS)
+    const glrdPS = PS_SECTEUR['LA_GAILLARDE'] ? [...PS_SECTEUR['LA_GAILLARDE']] : [];
+    Object.keys(PS_SECTEUR).forEach(k => delete PS_SECTEUR[k]);
+    PS_TOUS.length = 0;
+    const deja = new Set();
+    d.ps.forEach(p => {
+      // p.label est fourni par l'Apps Script (« N° - Nom », ou « N° » si le PS n'a pas encore de nom)
+      const label = p.label || `${p.num} - ${p.lieudit}`;
+      if (p.secteur) {
+        if (!PS_SECTEUR[p.secteur]) PS_SECTEUR[p.secteur] = [];
+        // LA_GAILLARDE : liste reprise telle quelle (aucun dédoublonnage) ; autres secteurs : doublons exacts ignorés
+        if (p.secteur === 'LA_GAILLARDE' || !PS_SECTEUR[p.secteur].includes(label)) PS_SECTEUR[p.secteur].push(label);
+      }
+      // « Autres PS » : tous les PS du jour sauf LA_GAILLARDE et les n° 30 à 41 (réservés au module LG)
+      if (normCle(p.secteur) !== 'LA_GAILLARDE' && !estPSLG(label) && !deja.has(label)) {
+        deja.add(label);
+        PS_TOUS.push({ label, secteur: normTxt(p.secteur) });
+      }
+    });
+    PS_TOUS.sort((a, b) => ((parsePS(a.label)[0] || {}).n || 0) - ((parsePS(b.label)[0] || {}).n || 0) || a.label.localeCompare(b.label, 'fr'));
+    // Restaurer LA_GAILLARDE si non fournie par Sheets
+    if (!PS_SECTEUR['LA_GAILLARDE'] && glrdPS.length) {
+      PS_SECTEUR['LA_GAILLARDE'] = glrdPS;
+    }
+  }
+
+  // Courses (REF_Courses) et km du jour (REF_KM) : facultatifs
+  COURSES_REF = Array.isArray(d.courses) ? d.courses : [];
+  KM_REF      = Array.isArray(d.km) ? d.km : [];
+  majDatalistCourses();
+
+  // Dates des jours (CONFIG → DATE_J1)
+  appliquerDateJ1(d.config && d.config.DATE_J1);
+
+  // Mettre à jour RADIO_MAX depuis la config Sheets
+  if (d.config) {
+    if (d.config.MAX_COM) RADIO_MAX.com = d.config.MAX_COM;
+    if (d.config.MAX_CRS) RADIO_MAX.crs = d.config.MAX_CRS;
+    if (d.config.MAX_CMV) RADIO_MAX.cmv = d.config.MAX_CMV;
+  } else if (d.radioMax) {
+    // Fallback ancien format
+    if (d.radioMax.com) RADIO_MAX.com = d.radioMax.com;
+    if (d.radioMax.crs) RADIO_MAX.crs = d.radioMax.crs;
+    if (d.radioMax.cmv) RADIO_MAX.cmv = d.radioMax.cmv;
+  }
+
+}
+
+// Pastille discrète (n'empêche pas la saisie) pendant la mise à jour en arrière-plan des listes
+function refMajAfficher(msg) {
+  let el = document.getElementById('refMajBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'refMajBanner';
+    el.style.cssText = `position:fixed;left:8px;bottom:8px;z-index:450;max-width:92vw;
+      background:rgba(15,52,96,0.95);color:#fff;padding:6px 12px;border-radius:6px;
+      font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:.5px;
+      border:1px solid #C0392B;pointer-events:none;`;
+    document.body.appendChild(el);
+  }
+  el.textContent = '⏳ ' + msg;
+  el.style.display = 'block';
+}
+function refMajMasquer() {
+  const el = document.getElementById('refMajBanner');
+  if (el) el.style.display = 'none';
+}
+
+// Mise à jour en arrière-plan quand la page est déjà ouverte avec les listes du cache.
+async function rafraichirReferentiels(jour, ancien) {
+  try {
+    const json = await callASLire({ action: 'getReferentiels', jour });
+    if (!json.ok) throw new Error(json.error);
+    refCacheEcrire(jour, json.data);
+    if (currentJour !== jour) return; // changement de jour entre-temps : le cache est à jour pour la prochaine fois
+    if (JSON.stringify(json.data) === ancien) {
+      refJourCharge = jour; refMajMasquer(); toast('Listes à jour ✓');
+      return;
+    }
+    appliquerReferentiels(json.data);
+    refJourCharge = jour;
+    refMajMasquer(); renderAll();
+    toast('Listes mises à jour depuis Google Sheets ✓');
+  } catch(e) {
+    refMajMasquer();
+    console.warn('Mise à jour des listes impossible :', e);
+    toast('Google ne répond pas — listes en mémoire conservées (la saisie reste possible)', 'warn');
+  }
+}
+
+// Charge les référentiels depuis Sheets au démarrage
+async function loadReferentiels() {
+  if (!SHEETS_ENABLED) return;
+  const jourChargement = currentJour;
+  // 1) Listes déjà connues de ce jour sur ce navigateur : affichage immédiat, mise à jour derrière
+  const memo = refCacheLire(jourChargement);
+  if (memo) {
+    try {
+      appliquerReferentiels(memo.d);
+      refJourCharge = null; // listes pas encore confirmées par Sheets : le module LG relit Sheets comme avant
+      hideRefError();
+      renderAll();
+      refMajAfficher('Listes du ' + refHeure(memo.t) + ' affichées — mise à jour depuis Google Sheets en cours…');
+      rafraichirReferentiels(jourChargement, JSON.stringify(memo.d)); // volontairement non attendu
+      return;
+    } catch(e) {
+      console.warn('Cache navigateur des listes inutilisable :', e);
+    }
+  }
+  // 2) Pas de cache pour ce jour : chargement normal depuis Sheets
+  try {
+    showLoadingBanner('Chargement des référentiels depuis Google Sheets…');
+    const json = await callASLire({ action: 'getReferentiels', jour: jourChargement });
+    if (!json.ok) throw new Error(json.error);
+    appliquerReferentiels(json.data);
+    refCacheEcrire(jourChargement, json.data);
+
+    refJourCharge = jourChargement;
+    hideLoadingBanner();
+    hideRefError();
+    // Re-render complet pour que les listes déroulantes (référants, PS, secteurs, véhicules) soient à jour
+    renderAll();
+    toast(`Référentiels chargés ✓ (${SECTEURS.length} secteurs, ${VEHICULES.length} véhicules)`);
+  } catch(e) {
+    hideLoadingBanner();
+    console.warn('Sheets error:', e);
+    if (!SECTEURS.length || !VEHICULES.length) {
+      // Aucune liste disponible (premier chargement échoué) : pas de repli en dur, on bloque et on propose de réessayer
+      showRefError(e && e.message ? e.message : 'Sheets inaccessible');
+    } else {
+      // Listes déjà chargées plus tôt dans la session (ex. changement de jour) : on les garde
+      toast('Sheets inaccessible — listes précédentes conservées', 'warn');
+    }
+  }
+}
+
+// Bandeau bloquant : listes Secteurs/Véhicules non chargées
+function showRefError(detail) {
+  let el = document.getElementById('refErrorBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'refErrorBanner';
+    el.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:600;
+      background:#7B1E14;color:#fff;text-align:center;padding:10px 12px;
+      font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:1px;
+      border-bottom:3px solid #E74C3C;box-shadow:0 4px 20px rgba(0,0,0,.5);`;
+    document.body.prepend(el);
+  }
+  el.innerHTML = '';
+  const msg = document.createElement('span');
+  msg.textContent = '⚠ Listes Secteurs / Véhicules non chargées depuis Google Sheets — saisie et sauvegarde bloquées. (' + detail + ')  ';
+  const btn = document.createElement('button');
+  btn.textContent = '↻ Réessayer';
+  btn.style.cssText = `margin-left:8px;padding:5px 16px;border-radius:6px;border:1px solid #fff;
+    background:#fff;color:#7B1E14;font-family:'Barlow Condensed',sans-serif;
+    font-size:15px;font-weight:700;letter-spacing:1px;cursor:pointer;`;
+  btn.onclick = () => {
+    btn.disabled = true; btn.textContent = '⏳';
+    loadReferentiels().then(() => { btn.disabled = false; btn.textContent = '↻ Réessayer'; if (SECTEURS.length && VEHICULES.length) loadSaisieFromSheets(currentJour); });
+  };
+  el.appendChild(msg); el.appendChild(btn);
+  el.style.display = 'block';
+}
+function hideRefError() {
+  const el = document.getElementById('refErrorBanner');
+  if (el) el.style.display = 'none';
+}
+
+// Charge la saisie existante d'un jour depuis Sheets
+async function loadSaisieFromSheets(jour) {
+  if (!SHEETS_ENABLED) return;
+  try {
+    showLoadingBanner(`Chargement saisie ${jour} depuis Google Sheets…`);
+    // Les deux lectures partent l'une après l'autre (et non en parallèle) : Google laisse tomber plus souvent des requêtes simultanées
+    const jsonSaisie = await callASLire({ action: 'getSaisie', jour });
+    const jsonComm   = await callASLire({ action: 'getCommentaires', jour });
+    hideLoadingBanner();
+    if (!jsonSaisie.ok) {
+      console.warn('getSaisie error:', jsonSaisie.error);
+      return; // silencieux — pas d'erreur affichée si Sheets vide
+    }
+    if (jsonSaisie.data && jsonSaisie.data.length) {
+      state[jour] = jsonSaisie.data.map(s => ({
+        secteur:      s.secteur,
+        referant:     s.referant,
+        hmepSect:     s.hmepSect,
+        collapsed:    false,
+        commentaires: jsonComm.ok && jsonComm.data && jsonComm.data[s.secteur]
+                        ? jsonComm.data[s.secteur] : ['','',''],
+        rows:         s.rows,
+      }));
+      renderAll();
+      toast(`Saisie ${jour} chargée depuis Sheets ✓`);
+    } else {
+      // Sheets vide pour ce jour — normal, pas d'erreur
+      console.log(`Sheets : aucune saisie pour ${jour}`);
+    }
+  } catch(e) {
+    hideLoadingBanner();
+    console.warn('Sheets load error:', e); // silencieux — on garde le localStorage
+  }
+}
+
+// Sauvegarde vers Sheets — envoie TOUS les secteurs du jour en un seul appel
+// Cela permet de supprimer correctement les secteurs retirés de l'interface
+let saveEnCours = false;   // un seul enregistrement à la fois (évite les envois parallèles qui se marchent dessus)
+
+async function saveToSheets() {
+  try { localStorage.setItem('ra2027_saisie', JSON.stringify(state)); } catch(e) {}
+  if (!SHEETS_ENABLED) { toast('Brouillon local sauvegardé ✓'); return; }
+  if (!SECTEURS.length || !VEHICULES.length) {
+    toast('Listes Secteurs/Véhicules non chargées — sauvegarde Sheets bloquée (brouillon local conservé)', 'err');
+    return;
+  }
+  if (saveEnCours) { toast('Enregistrement déjà en cours — patientez…', 'warn'); return; }
+  saveEnCours = true;
+
+  const btn = document.querySelector('.btn-pdf');
+  const etat = (txt) => { if (btn) { btn.textContent = txt; btn.disabled = true; } };
+  etat('⏳ Envoi des PS…');
+
+  const jour     = currentJour;
+  const secteurs = state[jour] || [];
+  let psOk = false;
+  const t0 = Date.now();
+  let essais = 1;
+
+  try {
+    // Envoyer TOUS les secteurs du jour en un seul appel
+    // Apps Script supprime toutes les lignes du jour et réécrit → gère les suppressions
+    const jsonSaisie = await envoyerSaisieJour(jour, secteurs, (n, max) => {
+      essais = Math.max(essais, n);
+      if (n > 1) { etat('⏳ Envoi… essai ' + n + '/' + max); toast('Connexion lente — relance automatique (essai ' + n + '/' + max + ')…', 'warn'); }
+    });
+    if (!jsonSaisie.ok) throw new Error(jsonSaisie.error);
+    psOk = true;
+
+    const dur = ((Date.now() - t0) / 1000).toFixed(1).replace('.', ',');
+    toast('Sheets mis à jour ✓ (' + (jsonSaisie.data.inserted || 0) + ' PS sauvegardés — ' + dur + ' s' + (essais > 1 ? ', ' + essais + ' essais' : '') + ')', essais > 1 ? 'warn' : '');
+  } catch(e) {
+    toast('Erreur envoi Sheets — brouillon local conservé', 'err');
+    console.error('Sheets save error:', e);
+  } finally {
+    // Le bouton est libéré dès que les PS sont traités : les commentaires partent ensuite en arrière-plan
+    saveEnCours = false;
+    if (btn) { btn.textContent = '💾 Sauvegarder'; btn.disabled = false; }
+  }
+
+  if (psOk) saveCommentairesArrierePlan(jour, secteurs);
+}
+
+// Commentaires secteur : un seul appel pour tout le jour ; repli secteur par secteur si le serveur est encore ancien
+async function saveCommentairesArrierePlan(jour, secteurs) {
+  const items = secteurs.filter(s => s.commentaires && s.commentaires.some(Boolean))
+    .map(s => ({ secteur: s.secteur, commentaires: s.commentaires }));
+  if (!items.length) return;
+  try {
+    const j = await callASSave({ action: 'saveCommentairesJour', jour, data: JSON.stringify(items) });
+    if (j.ok) return;
+    if (!/Action inconnue/i.test(String(j.error || ''))) throw new Error(j.error);
+    for (const it of items) {                       // ancien Apps Script : repli
+      await callASSave({ action: 'saveCommentaires', jour, secteur: it.secteur, data: JSON.stringify(it.commentaires) });
+    }
+  } catch(e) {
+    console.warn('saveCommentaires:', e.message);
+    toast('⚠ Les PS sont enregistrés, mais pas les commentaires secteur — cliquez de nouveau sur Sauvegarder', 'warn');
+  }
+}
+
+// Bannière de chargement
+function showLoadingBanner(msg) {
+  let el = document.getElementById('loadingBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loadingBanner';
+    el.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:500;
+      background:rgba(15,52,96,0.95);color:#fff;text-align:center;
+      padding:8px;font-family:'Barlow Condensed',sans-serif;font-size:14px;
+      letter-spacing:1px;border-bottom:2px solid #C0392B;`;
+    document.body.prepend(el);
+  }
+  el.textContent = '⏳ ' + msg;
+  el.style.display = 'block';
+}
+function hideLoadingBanner() {
+  const el = document.getElementById('loadingBanner');
+  if (el) el.style.display = 'none';
+}
+
+// ========================================================
+// SAVE (localStorage + Sheets)
+// ========================================================
+function saveDraft() { saveToSheets(); }
+
+function loadDraft() {
+  try {
+    const saved = localStorage.getItem('ra2027_saisie');
+    if (saved) {
+      state = JSON.parse(saved);
+      toast('Brouillon chargé');
+    }
+  } catch(e) {}
+}
+
+// ========================================================
+// TOAST
+// ========================================================
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type === 'warn' ? 'warn' : type === 'err' ? 'err' : ''}`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ========================================================
+// INIT
+// ========================================================
+initState();
+loadDraft(); // fallback localStorage
+
+// Charge depuis Sheets si URL configurée
+loadReferentiels().then(() => {
+  renderAll();
+  loadSaisieFromSheets(currentJour);
+});
+
+// Quand on change de jour, recharge depuis Sheets
+const _switchJourOrig = switchJour;
+switchJour = function(jid) {
+  currentJour = jid;
+  renderAll();
+  // Recharger référentiels filtrés pour ce jour (bénévoles + PS disponibles)
+  loadReferentiels().then(() => {
+    loadSaisieFromSheets(jid);
+  });
+};
+
+// Close overlays on background click
+document.getElementById('reportOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeReport();
+});
+document.getElementById('ficheSectOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeFicheSecteur();
+});
+document.getElementById('fichesPSOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeFichesPS();
+});
+</script>
+
+<!-- LA_GAILLARDE OVERLAY -->
+<div class="glrd-overlay" id="glrdOverlay">
+  <div class="glrd-panel">
+    <div class="glrd-header">
+      <span class="glrd-title">🏔 LA_GAILLARDE — Fiches de Poste</span>
+      <select id="glrdJourSelect" onchange="glrdChargerJour()"
+        style="background:#fff;color:#111;border:none;border-radius:4px;
+          padding:5px 10px;font-family:'Barlow Condensed',sans-serif;
+          font-size:14px;font-weight:700;cursor:pointer"></select>
+      <button class="btn-fiche-print" onclick="glrdSauvegarder()" id="glrdBtnSave">💾 Sauvegarder</button>
+      <button class="btn-close" onclick="closeGaillarde()">✕</button>
+    </div>
+
+    <!-- Stats bar -->
+    <div id="glrdStatsBar" style="background:#f5f5f5;border-bottom:1px solid #ddd;
+      padding:8px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12px;
+      position:relative">
+      <span id="glrdStatPS" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#1A3A5C">● PS actifs : 0</span>
+      <span id="glrdStatBenv" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#27AE60">● Bénévoles : 0</span>
+      <span id="glrdStatCOM" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#2980B9">COM 0</span>
+      <span id="glrdStatCRS" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#006064">CRS 0</span>
+      <span id="glrdStatCMV" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#1E8449">CMV 0</span>
+    </div>
+    <!-- Alertes doublons LG -->
+    <div id="glrdAlertsBar" style="display:none;padding:6px 20px;background:#FFF3E0;border-bottom:2px solid #E67E22"></div>
+
+    <!-- ONGLETS -->
+    <div class="glrd-tabs">
+      <button class="glrd-tab active" onclick="glrdTab('saisie', this)">📝 Saisie</button>
+      <button class="glrd-tab" onclick="glrdTab('fiches', this)">🖨 Fiches de Poste</button>
+      <button class="glrd-tab" onclick="glrdTab('report', this)">📋 Report Jx</button>
+    </div>
+
+    <!-- TAB SAISIE -->
+    <div class="glrd-tab-content active" id="glrdTabSaisie">
+      <div id="glrdPSList"></div>
+      <button class="glrd-btn-add" onclick="glrdAddPS()">＋ Ajouter un PS</button>
+    </div>
+
+    <!-- TAB FICHES DE POSTE -->
+    <div class="glrd-tab-content" id="glrdTabFiches">
+      <div class="glrd-benv-selector" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
+          letter-spacing:1px;text-transform:uppercase;color:#888">Bénévole :</label>
+        <select id="glrdBenvSelect" onchange="glrdFilterByBenv()"
+          style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;min-width:180px">
+          <option value="">— Tous —</option>
+        </select>
+        <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
+          letter-spacing:1px;text-transform:uppercase;color:#888;margin-left:8px">PS :</label>
+        <select id="glrdPSFicheSelect" onchange="glrdFilterByPS()"
+          style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;min-width:220px">
+          <option value="">— Tous —</option>
+        </select>
+        <button class="btn-fiche-print" onclick="glrdImprimerFiches()" style="margin-left:auto">🖨 Imprimer</button>
+      </div>
+      <div id="glrdFichesBody"></div>
+    </div>
+
+    <!-- TAB REPORT Jx -->
+    <div class="glrd-tab-content" id="glrdTabReport">
+      <div style="margin-bottom:12px;display:flex;justify-content:flex-end">
+        <button class="btn-fiche-print" onclick="glrdImprimerReport()">🖨 Imprimer le report</button>
+      </div>
+      <div id="glrdReportBody"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+
+
