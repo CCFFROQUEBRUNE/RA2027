@@ -3467,7 +3467,7 @@ function renderFicheSecteur() {
 // APPS SCRIPT — Connexion Google Sheets
 // L'adresse (APPS_SCRIPT_URL) est définie tout en haut du fichier
 // ========================================================
-const SHEETS_ENABLED  = APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT_00UAQha4-r4vkSIsfZDmgawohGZWUv3k-gUr90Ew4gEt_RGcpQQ/exec';
+const SHEETS_ENABLED  = /^https:\/\/script\.google\.com\//.test(APPS_SCRIPT_URL);   // faux tant que l'adresse n'est pas renseignée (ligne 16)
 
 // ── Appel Apps Script via JSONP (contourne les limitations CORS/redirect) ──
 function callAS(params, timeoutMs = 90000, rapide = false) {
