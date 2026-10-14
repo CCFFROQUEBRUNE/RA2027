@@ -2967,20 +2967,29 @@ function sectDataFiche(secteurNom, jourId) {
   return (state[jourId] || []).find(s => s.secteur === secteurNom);
 }
 
-// Options du menu secteur pour un jour : groupe ★, secteurs normaux, puis PS sans secteur un par un
+// Nombre de PS saisis (n° de PS renseigné) dans un bloc de saisie
+function nbPSSaisis(sd) { return (sd.rows || []).filter(r => r.ps).length; }
+
+// Options du menu secteur pour un jour : groupe ★, puis UNIQUEMENT les secteurs ayant au moins un PS saisi ce jour-là
+// (avec leur nombre de PS), puis PS sans secteur un par un.
 function optionsSecteursFiches(jourId) {
-  const dispos = [...new Set([
-    ...SECTEURS,
-    ...(state[jourId] || []).map(s => s.secteur)
-  ])].filter(s => s !== SOLO_VIDE);
-  const normaux = dispos.filter(s => !estSolo(s));
-  const solos   = dispos.filter(s => estSolo(s) && (state[jourId] || []).some(sd => sd.secteur === s));
+  const blocs = (state[jourId] || []).filter(sd => sd.secteur !== SOLO_VIDE && nbPSSaisis(sd) > 0);
+  const normaux = blocs.filter(sd => !estSolo(sd.secteur));
+  const solos   = blocs.filter(sd => estSolo(sd.secteur));
+  const ordre = s => { const i = SECTEURS.indexOf(s); return i < 0 ? 9999 : i; };      // ordre de REF_Secteurs, puis les autres
+  normaux.sort((a, b) => ordre(a.secteur) - ordre(b.secteur) || String(a.secteur).localeCompare(String(b.secteur)));
+  if (!blocs.length) return '<option value="" disabled selected>Aucune saisie ce jour</option>';
   let h = '';
   if (blocsSoloJour(jourId).length) h += `<option value="${GROUPE_SOLO}">${GROUPE_SOLO_LABEL}</option>`;
-  h += normaux.map(s => `<option value="${attrEsc(s)}">${s}</option>`).join('');
+  h += normaux.map(sd => `<option value="${attrEsc(sd.secteur)}">${sd.secteur} (${nbPSSaisis(sd)} PS)</option>`).join('');
   if (solos.length) h += `<optgroup label="PS sans secteur (un par un)">` +
-    solos.map(s => `<option value="${attrEsc(s)}">${s}</option>`).join('') + `</optgroup>`;
+    solos.map(sd => `<option value="${attrEsc(sd.secteur)}">${sd.secteur}</option>`).join('') + `</optgroup>`;
   return h;
+}
+
+// Jour pas encore en mémoire dans la page (aucun PS saisi) : à charger depuis le Sheet
+function jourACharger(jourId) {
+  return SHEETS_ENABLED && !(state[jourId] || []).some(sd => nbPSSaisis(sd) > 0);
 }
 
 // Remplit un menu secteur pour un jour en gardant la sélection si elle existe encore
@@ -3008,9 +3017,13 @@ function openFicheSecteur() {
 }
 
 // Changement de jour : on reconstruit la liste des secteurs de CE jour (les PS sans secteur diffèrent d'un jour à l'autre)
-function fsChangeJour() {
-  remplirMenuSecteursFiches(document.getElementById('fsSecteurSelect'), document.getElementById('fsJourSelect').value);
-  renderFicheSecteur();
+async function fsChangeJour() {
+  const jid = document.getElementById('fsJourSelect').value;
+  const maj = () => { remplirMenuSecteursFiches(document.getElementById('fsSecteurSelect'), jid); renderFicheSecteur(); };
+  maj();
+  if (!jourACharger(jid)) return;
+  await loadSaisieFromSheets(jid, true);                  // jour pas encore ouvert dans cette page : lu depuis le Sheet
+  if (document.getElementById('fsJourSelect').value === jid) maj();
 }
 
 function closeFicheSecteur() {
@@ -3054,9 +3067,13 @@ function openFichesPS() {
 }
 
 // Changement de jour : liste des secteurs reconstruite pour CE jour
-function fpsChangeJour() {
-  remplirMenuSecteursFiches(document.getElementById('fpsSecteurSelect'), document.getElementById('fpsJourSelect').value);
-  renderFichesPS();
+async function fpsChangeJour() {
+  const jid = document.getElementById('fpsJourSelect').value;
+  const maj = () => { remplirMenuSecteursFiches(document.getElementById('fpsSecteurSelect'), jid); renderFichesPS(); };
+  maj();
+  if (!jourACharger(jid)) return;
+  await loadSaisieFromSheets(jid, true);
+  if (document.getElementById('fpsJourSelect').value === jid) maj();
 }
 
 function closeFichesPS() {
@@ -3224,7 +3241,9 @@ function renderFichesPSCards() {
   const sectData = sectDataFiche(secteurNom, jourId);
 
   if (!sectData) {
-    body.innerHTML = `<div class="fs-empty">Aucune saisie pour ${secteurNom === GROUPE_SOLO ? 'les PS sans secteur' : secteurNom} en ${jourId}</div>`;
+    body.innerHTML = secteurNom
+      ? `<div class="fs-empty">Aucune saisie pour ${secteurNom === GROUPE_SOLO ? 'les PS sans secteur' : secteurNom} en ${jourId}</div>`
+      : `<div class="fs-empty">Aucune saisie en ${jourId}</div>`;
     return;
   }
 
@@ -3274,7 +3293,9 @@ function renderFicheSecteur() {
   const groupe   = !!(sectData && sectData._groupe);
 
   if (!sectData) {
-    body.innerHTML = `<div class="fs-empty">Aucune saisie pour le secteur <strong>${secteurNom === GROUPE_SOLO ? 'PS sans secteur' : secteurNom}</strong> en ${jourId}.</div>`;
+    body.innerHTML = secteurNom
+      ? `<div class="fs-empty">Aucune saisie pour le secteur <strong>${secteurNom === GROUPE_SOLO ? 'PS sans secteur' : secteurNom}</strong> en ${jourId}.</div>`
+      : `<div class="fs-empty">Aucune saisie en ${jourId}.</div>`;
     return;
   }
 
@@ -3446,7 +3467,7 @@ function renderFicheSecteur() {
 // APPS SCRIPT — Connexion Google Sheets
 // L'adresse (APPS_SCRIPT_URL) est définie tout en haut du fichier
 // ========================================================
-const SHEETS_ENABLED  = APPS_SCRIPT_URL !== 'REMPLACER_PAR_URL_APPS_SCRIPT';
+const SHEETS_ENABLED  = APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT_00UAQha4-r4vkSIsfZDmgawohGZWUv3k-gUr90Ew4gEt_RGcpQQ/exec';
 
 // ── Appel Apps Script via JSONP (contourne les limitations CORS/redirect) ──
 function callAS(params, timeoutMs = 90000, rapide = false) {
@@ -3821,7 +3842,7 @@ function hideRefError() {
 }
 
 // Charge la saisie existante d'un jour depuis Sheets
-async function loadSaisieFromSheets(jour) {
+async function loadSaisieFromSheets(jour, silencieux) {
   if (!SHEETS_ENABLED) return;
   try {
     showLoadingBanner(`Chargement saisie ${jour} depuis Google Sheets…`);
@@ -3843,8 +3864,8 @@ async function loadSaisieFromSheets(jour) {
                         ? jsonComm.data[s.secteur] : ['','',''],
         rows:         s.rows,
       }));
-      renderAll();
-      toast(`Saisie ${jour} chargée depuis Sheets ✓`);
+      if (!silencieux || jour === currentJour) renderAll();
+      if (!silencieux) toast(`Saisie ${jour} chargée depuis Sheets ✓`);
     } else {
       // Sheets vide pour ce jour — normal, pas d'erreur
       console.log(`Sheets : aucune saisie pour ${jour}`);
