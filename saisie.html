@@ -854,10 +854,13 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT
 
 
   /* ── Présence des opérateurs ── */
-  .pres-banner { display:none; align-items:center; gap:12px; background:#E67E22; color:#fff; padding:8px 20px;
-    font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; letter-spacing:.5px; border-bottom:2px solid #B9560B; }
+  .pres-banner { display:none; align-items:center; gap:12px; background:#B71C1C; color:#fff; padding:8px 20px;
+    font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; letter-spacing:.5px; border-top:2px solid #FF8A80; }
+  .pres-banner .pres-stop { flex:none; background:#fff; color:#B71C1C; padding:3px 12px; border-radius:4px; font-size:18px; font-weight:900;
+    letter-spacing:1px; animation:presBlink 1s steps(2,start) infinite; }
   .pres-banner .pres-txt { flex:1; }
-  .pres-banner button { background:rgba(0,0,0,.25); color:#fff; border:none; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:15px; }
+  @keyframes presBlink { 50% { visibility:hidden; } }
+  @media (prefers-reduced-motion: reduce) { .pres-banner .pres-stop { animation:none; } }
   .btn-nom { background:transparent; color:#cfd8e6; border:1px solid rgba(255,255,255,.25); border-radius:12px; padding:1px 10px;
     margin-left:10px; font-family:'Barlow',sans-serif; font-size:12px; cursor:pointer; vertical-align:middle; }
   #nom-overlay { position:fixed; inset:0; z-index:9000; background:rgba(8,12,24,.88); display:none; align-items:center; justify-content:center; }
@@ -1089,8 +1092,8 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT
       <button class="btn-action btn-pdf" onclick="saveDraft()">💾 Sauvegarder</button>
     </div>
   </div>
+  <div class="pres-banner" id="presBanner"><span class="pres-stop">⛔ NE PAS SAUVEGARDER</span><span class="pres-txt"></span></div>
 </header>
-<div class="pres-banner" id="presBanner"><span class="pres-txt"></span><button onclick="presFermer()" title="Masquer">✕</button></div>
 
 <div id="nom-overlay"><div id="nom-card">
   <h3>👤 Votre nom</h3>
@@ -3625,7 +3628,6 @@ const PRES_SID = Math.random().toString(36).slice(2, 10) + Date.now().toString(3
 const PRES_INTERVAL_MS = 60000;
 let presAutres = [];            // autres opérateurs actifs sur le même module et le même jour (dernière réponse du serveur)
 let presVus = new Set();        // noms déjà signalés (le bip ne retentit que pour un nouvel arrivant)
-let presMasque = '';            // jeu de noms dont l'utilisateur a fermé le bandeau
 let presClef = '';              // « TS|J3 » du dernier ping
 let presDemarre = false;
 
@@ -3654,25 +3656,23 @@ function presAfficher() {
   const mod = presModule(), jour = presJour();
   const bT = document.getElementById('presBanner'), bL = document.getElementById('glrdPresBanner');
   [bT, bL].forEach(b => { if (b) b.style.display = 'none'; });
-  if (!noms.length) { presVus = new Set(); presMasque = ''; return; }
+  if (!noms.length) { presVus = new Set(); return; }
   const nouveaux = noms.filter(n => !presVus.has(n));
-  if (nouveaux.length) { noms.forEach(n => presVus.add(n)); presBip(); presMasque = ''; }
-  if (cle === presMasque) return;
+  if (nouveaux.length) { noms.forEach(n => presVus.add(n)); presBip(); }
   const age = Math.min(...presAutres.map(a => a.age));
   const liste = noms.length > 1 ? noms.slice(0, -1).join(', ') + ' et ' + noms[noms.length - 1] : noms[0];
-  const txt = '⚠ ' + liste + (noms.length > 1 ? ' sont connectés' : ' est connecté') + ' sur ' + mod + ' ' + jour + ' (' + presTexteAge(age) + '). '
-            + 'Un seul opérateur par module et par jour : un enregistrement remplace toute la journée.';
+  const txt = liste + (noms.length > 1 ? ' sont connectés' : ' est connecté') + ' sur ' + mod + ' ' + jour + ' (' + presTexteAge(age) + '). '
+            + 'Un enregistrement remplace toute la journée : concertez-vous avant d\'enregistrer.';
   const b = mod === 'LG' ? bL : bT;
   if (b) { b.querySelector('.pres-txt').textContent = txt; b.style.display = 'flex'; }
 }
-function presFermer() { presMasque = [...new Set(presAutres.map(a => a.nom))].sort().join('|'); presAfficher(); }
 
 // Signale la présence et récupère les autres opérateurs. Silencieux en cas d'échec (jamais bloquant).
 async function presPing(quitter) {
   if (!SHEETS_ENABLED || !presDemarre) return;
   const mod = presModule(), jour = presJour();
   const clef = mod + '|' + jour;
-  if (clef !== presClef) { presClef = clef; presVus = new Set(); presMasque = ''; presAutres = []; presAfficher(); }
+  if (clef !== presClef) { presClef = clef; presVus = new Set(); presAutres = []; presAfficher(); }
   try {
     const r = await callAS({ action: 'presence', sid: PRES_SID, nom: presNom() || 'Opérateur sans nom', mod, jour }, 8000, true);
     if (r && r.ok && r.data && !r.data.inconnu && presClef === mod + '|' + jour) { presAutres = r.data.autres || []; presAfficher(); }
@@ -4171,7 +4171,7 @@ document.getElementById('fichesPSOverlay').addEventListener('click', function(e)
       <button class="btn-fiche-print" onclick="glrdSauvegarder()" id="glrdBtnSave">💾 Sauvegarder</button>
       <button class="btn-close" onclick="closeGaillarde()">✕</button>
     </div>
-    <div class="pres-banner" id="glrdPresBanner"><span class="pres-txt"></span><button onclick="presFermer()" title="Masquer">✕</button></div>
+    <div class="pres-banner" id="glrdPresBanner"><span class="pres-stop">⛔ NE PAS SAUVEGARDER</span><span class="pres-txt"></span></div>
 
     <!-- Stats bar -->
     <div id="glrdStatsBar" style="background:#f5f5f5;border-bottom:1px solid #ddd;
