@@ -852,6 +852,22 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT
   .btn-fiche-print { background: #C0392B; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; margin-top: 16px; }
   .btn-fiche-print:hover { background: #E74C3C; }
 
+
+  /* ── Présence des opérateurs ── */
+  .pres-banner { display:none; align-items:center; gap:12px; background:#E67E22; color:#fff; padding:8px 20px;
+    font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; letter-spacing:.5px; border-bottom:2px solid #B9560B; }
+  .pres-banner .pres-txt { flex:1; }
+  .pres-banner button { background:rgba(0,0,0,.25); color:#fff; border:none; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:15px; }
+  .btn-nom { background:transparent; color:#cfd8e6; border:1px solid rgba(255,255,255,.25); border-radius:12px; padding:1px 10px;
+    margin-left:10px; font-family:'Barlow',sans-serif; font-size:12px; cursor:pointer; vertical-align:middle; }
+  #nom-overlay { position:fixed; inset:0; z-index:9000; background:rgba(8,12,24,.88); display:none; align-items:center; justify-content:center; }
+  #nom-card { background:#16213e; border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:24px 28px; width:min(420px,92vw); color:#fff; font-family:'Barlow',sans-serif; }
+  #nom-card h3 { margin:0 0 6px; font-family:'Barlow Condensed',sans-serif; font-size:22px; letter-spacing:1px; }
+  #nom-card p { margin:0 0 14px; font-size:13px; opacity:.8; }
+  #nom-card input { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px; border:1px solid #4a5a7a; background:#0f1930; color:#fff; font-size:16px; }
+  #nom-card .nom-btns { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+  #nom-card button { padding:8px 18px; border-radius:8px; border:none; cursor:pointer; font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; }
+
   /* ============================================================
      OVERLAY PIN — saisie.html
      ============================================================ */
@@ -1060,7 +1076,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT
 <!-- HEADER -->
 <header>
   <div class="header-inner">
-    <div class="header-title">🚵 ROC D'AZUR <span id="anneeHeader"></span> — Saisie Bénévoles</div>
+    <div class="header-title">🚵 ROC D'AZUR <span id="anneeHeader"></span> — Saisie Bénévoles<button class="btn-nom" id="btnNom" onclick="presChangerNom()" title="Votre nom : visible des autres opérateurs">👤 …</button></div>
     <div class="header-controls">
       <div class="jour-selector" id="jourSelector"></div>
       <span class="badge-conflicts" id="badgeConflicts">⚠ Conflits</span>
@@ -1074,6 +1090,14 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymyjBbzhX3PsiT
     </div>
   </div>
 </header>
+<div class="pres-banner" id="presBanner"><span class="pres-txt"></span><button onclick="presFermer()" title="Masquer">✕</button></div>
+
+<div id="nom-overlay"><div id="nom-card">
+  <h3>👤 Votre nom</h3>
+  <p>Pour prévenir les autres opérateurs si vous saisissez en même temps. Mémorisé sur cet ordinateur.</p>
+  <input id="nomInput" type="text" maxlength="40" placeholder="ex : Marc" autocomplete="off">
+  <div class="nom-btns"><button id="nomPasser" onclick="presValiderNom(false)" style="background:#34425f;color:#fff">Passer</button><button onclick="presValiderNom(true)" style="background:#C0392B;color:#fff">OK</button></div>
+</div></div>
 
 <main>
   <div class="date-bar">
@@ -2260,6 +2284,7 @@ function openGaillarde() {
   delete glrdState[glrdJour];
   delete glrdBenevCache[glrdJour]; // relire les disponibilités du Sheet
   document.getElementById('glrdOverlay').classList.add('active');
+  presPing();
   glrdChargerJour();
 }
 
@@ -2286,6 +2311,7 @@ function glrdToast(msg, type='ok') {
 
 function closeGaillarde() {
   document.getElementById('glrdOverlay').classList.remove('active');
+  presPing();
 }
 
 function glrdTab(name, btn) {
@@ -2301,6 +2327,7 @@ async function glrdChargerJour() {
   // Lire le jour depuis le select ; si vide (premier rendu), garder glrdJour déjà fixé
   const selVal = document.getElementById('glrdJourSelect').value;
   if (selVal) glrdJour = selVal;
+  presPing();
   const jourDemande = glrdJour;
   // Bénévoles disponibles CE jour-là (sinon les listes restent celles du jour Tous Secteurs)
   const benevOk = await glrdChargerBenevoles(jourDemande);
@@ -2558,6 +2585,7 @@ function glrdFieldSelect(label, idx, field, value, opts) {
 
 
 async function glrdSauvegarder() {
+  if (!(await presConfirmerEnvoi())) return;   // un autre opérateur est actif sur ce jour : confirmation
   const btn = document.getElementById('glrdBtnSave');
   if (btn) { btn.textContent = '⏳ Envoi…'; btn.disabled = true; }
   const rows = glrdState[glrdJour] || [];
@@ -3590,6 +3618,112 @@ async function callASLire(params) {
   throw derniere;
 }
 
+// ========================================================
+// PRÉSENCE DES OPÉRATEURS — avertissement (rien n'est bloqué)
+// ========================================================
+const PRES_SID = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const PRES_INTERVAL_MS = 60000;
+let presAutres = [];            // autres opérateurs actifs sur le même module et le même jour (dernière réponse du serveur)
+let presVus = new Set();        // noms déjà signalés (le bip ne retentit que pour un nouvel arrivant)
+let presMasque = '';            // jeu de noms dont l'utilisateur a fermé le bandeau
+let presClef = '';              // « TS|J3 » du dernier ping
+let presDemarre = false;
+
+function presNom() { try { return localStorage.getItem('ra2027_nom') || ''; } catch(e) { return ''; } }
+function presModule() { const o = document.getElementById('glrdOverlay'); return o && o.classList.contains('active') ? 'LG' : 'TS'; }
+function presJour() { return presModule() === 'LG' ? glrdJour : currentJour; }
+function presMajChip() { const b = document.getElementById('btnNom'); if (b) b.textContent = '👤 ' + (presNom() || 'nom ?') + ' ✎'; }
+
+function presBip() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.16, 0.32].forEach(t => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination); o.type = 'sine'; o.frequency.value = 660;
+      g.gain.setValueAtTime(0.3, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.12);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.12);
+    });
+  } catch(e) {}
+}
+
+function presTexteAge(sec) { return sec < 60 ? 'actif il y a ' + sec + ' s' : 'actif il y a ' + Math.round(sec / 60) + ' min'; }
+
+function presAfficher() {
+  const noms = [...new Set(presAutres.map(a => a.nom))];
+  const cle = noms.slice().sort().join('|');
+  const mod = presModule(), jour = presJour();
+  const bT = document.getElementById('presBanner'), bL = document.getElementById('glrdPresBanner');
+  [bT, bL].forEach(b => { if (b) b.style.display = 'none'; });
+  if (!noms.length) { presVus = new Set(); presMasque = ''; return; }
+  const nouveaux = noms.filter(n => !presVus.has(n));
+  if (nouveaux.length) { noms.forEach(n => presVus.add(n)); presBip(); presMasque = ''; }
+  if (cle === presMasque) return;
+  const age = Math.min(...presAutres.map(a => a.age));
+  const liste = noms.length > 1 ? noms.slice(0, -1).join(', ') + ' et ' + noms[noms.length - 1] : noms[0];
+  const txt = '⚠ ' + liste + (noms.length > 1 ? ' sont connectés' : ' est connecté') + ' sur ' + mod + ' ' + jour + ' (' + presTexteAge(age) + '). '
+            + 'Un seul opérateur par module et par jour : un enregistrement remplace toute la journée.';
+  const b = mod === 'LG' ? bL : bT;
+  if (b) { b.querySelector('.pres-txt').textContent = txt; b.style.display = 'flex'; }
+}
+function presFermer() { presMasque = [...new Set(presAutres.map(a => a.nom))].sort().join('|'); presAfficher(); }
+
+// Signale la présence et récupère les autres opérateurs. Silencieux en cas d'échec (jamais bloquant).
+async function presPing(quitter) {
+  if (!SHEETS_ENABLED || !presDemarre) return;
+  const mod = presModule(), jour = presJour();
+  const clef = mod + '|' + jour;
+  if (clef !== presClef) { presClef = clef; presVus = new Set(); presMasque = ''; presAutres = []; presAfficher(); }
+  try {
+    const r = await callAS({ action: 'presence', sid: PRES_SID, nom: presNom() || 'Opérateur sans nom', mod, jour }, 8000, true);
+    if (r && r.ok && r.data && !r.data.inconnu && presClef === mod + '|' + jour) { presAutres = r.data.autres || []; presAfficher(); }
+  } catch(e) { console.warn('présence :', e.message); }
+}
+
+// Avant un enregistrement : relecture fraîche des présences ; si quelqu'un d'autre est actif, confirmation explicite.
+async function presConfirmerEnvoi() {
+  if (!SHEETS_ENABLED || !presDemarre) return true;
+  await presPing();
+  if (!presAutres.length) return true;
+  const noms = [...new Set(presAutres.map(a => a.nom))];
+  return window.confirm(noms.join(', ') + (noms.length > 1 ? ' sont aussi connectés' : ' est aussi connecté') + ' sur ' + presModule() + ' ' + presJour()
+    + '.\nVotre enregistrement remplacera toute la journée.\n\nEnregistrer quand même ?');
+}
+
+function presChangerNom() {
+  const o = document.getElementById('nom-overlay'), i = document.getElementById('nomInput');
+  i.value = presNom() === 'Opérateur sans nom' ? '' : presNom();
+  o.style.display = 'flex'; setTimeout(() => i.focus(), 50);
+}
+function presValiderNom(avecNom) {
+  const v = avecNom ? document.getElementById('nomInput').value.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+  try { localStorage.setItem('ra2027_nom', v || 'Opérateur sans nom'); } catch(e) {}
+  document.getElementById('nom-overlay').style.display = 'none';
+  presMajChip();
+  if (!presDemarre) presLancer(); else presPing();
+}
+function presLancer() {
+  if (presDemarre) return;
+  presDemarre = true;
+  presPing();
+  setInterval(() => presPing(), PRES_INTERVAL_MS);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') presPing(); });
+  window.addEventListener('pagehide', () => {
+    try { new Image().src = APPS_SCRIPT_URL + '?action=presence&quitter=1&sid=' + PRES_SID + '&mod=' + presModule() + '&jour=' + presJour() + '&callback=presBye'; } catch(e) {}
+  });
+}
+window.presBye = function() {};
+// Démarrage : attend que le code PIN soit passé (ou absent), demande le nom si besoin, puis signale la présence
+(function presInit() {
+  presMajChip();
+  document.getElementById('nomInput').addEventListener('keydown', e => { if (e.key === 'Enter') presValiderNom(true); });
+  const t = setInterval(() => {
+    const po = document.getElementById('pin-overlay');
+    if (po && getComputedStyle(po).display !== 'none') return;
+    clearInterval(t);
+    if (!presNom()) presChangerNom(); else presLancer();
+  }, 500);
+})();
+
 // ── Cache navigateur des référentiels (par jour) ─────────────────────────────
 // But : si Google ne livre pas la réponse (lenteur constatée le 08/10), la page s'ouvre aussitôt avec les
 // dernières listes connues de ce jour, puis les met à jour en arrière-plan. Les listes ne sont JAMAIS inventées :
@@ -3889,6 +4023,7 @@ async function saveToSheets() {
   }
   if (saveEnCours) { toast('Enregistrement déjà en cours — patientez…', 'warn'); return; }
   saveEnCours = true;
+  if (!(await presConfirmerEnvoi())) { saveEnCours = false; return; }   // un autre opérateur est actif sur ce jour : confirmation
 
   const btn = document.querySelector('.btn-pdf');
   const etat = (txt) => { if (btn) { btn.textContent = txt; btn.disabled = true; } };
@@ -4005,6 +4140,7 @@ const _switchJourOrig = switchJour;
 switchJour = function(jid) {
   currentJour = jid;
   renderAll();
+  presPing();
   // Recharger référentiels filtrés pour ce jour (bénévoles + PS disponibles)
   loadReferentiels().then(() => {
     loadSaisieFromSheets(jid);
@@ -4035,6 +4171,7 @@ document.getElementById('fichesPSOverlay').addEventListener('click', function(e)
       <button class="btn-fiche-print" onclick="glrdSauvegarder()" id="glrdBtnSave">💾 Sauvegarder</button>
       <button class="btn-close" onclick="closeGaillarde()">✕</button>
     </div>
+    <div class="pres-banner" id="glrdPresBanner"><span class="pres-txt"></span><button onclick="presFermer()" title="Masquer">✕</button></div>
 
     <!-- Stats bar -->
     <div id="glrdStatsBar" style="background:#f5f5f5;border-bottom:1px solid #ddd;
